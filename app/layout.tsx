@@ -3,6 +3,7 @@ import { Archivo, IBM_Plex_Mono } from 'next/font/google'
 import './globals.css'
 import { AppProviders } from '@/components/providers/app-providers'
 import { AppShell } from '@/components/shell/app-shell'
+import { Analytics } from '@vercel/analytics/react'
 
 const archivo = Archivo({
   subsets: ['latin'],
@@ -41,6 +42,7 @@ export default function RootLayout({
         <AppProviders>
           <AppShell>{children}</AppShell>
         </AppProviders>
+        <Analytics />
       </body>
     </html>
   )
