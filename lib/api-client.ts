@@ -1,5 +1,7 @@
 export type ApiResult<T> = { data: T | null; error?: string; fallback: boolean; status?: number }
 
+import type { TrackFacts } from '@/lib/data'
+
 export type ApiTrack = {
   id: string
   title: string
@@ -8,6 +10,7 @@ export type ApiTrack = {
   audioUrl?: string
   coverUrl?: string
   durationSec?: number
+  facts?: TrackFacts
   createdAt?: string
 }
 
@@ -70,7 +73,7 @@ export const apiClient = {
     create: (release: Omit<ApiRelease, 'id'>) => fetcher<{ release: ApiRelease }>('/api/releases', { method: 'POST', body: release }),
     getFeed: () => fetcher<{ releases: ApiRelease[] }>('/api/releases'),
     getChart: () => fetcher<{ releases: ApiRelease[] }>('/api/releases?sort=chart'),
-    rateRelease: (releaseId: string, ownerId: string, criteria: number[]) => fetcher<{ releaseId: string; score: number; total: number }>('/api/rzt', { method: 'POST', body: { releaseId, owner_id: ownerId, criteria } }),
+    rateRelease: (releaseId: string, ownerId: string, criteria: number[]) => fetcher<{ releaseId: string; score: number; total: number }>('/api/gzt', { method: 'POST', body: { releaseId, owner_id: ownerId, criteria } }),
   },
   workspace: {
     syncCards: (snapshot: WorkspaceSnapshotPayload) => fetcher<{ snapshot: WorkspaceSnapshotPayload }>('/api/workspace/sync', { method: 'POST', body: snapshot }),

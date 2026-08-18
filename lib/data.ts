@@ -15,6 +15,16 @@ export type Credit = {
 
 export type LyricLine = { t: number; text: string; section?: boolean }
 
+export type TrackFacts = {
+  producedBy?: Credit[]
+  writtenBy?: Credit[]
+  mixedMasteredBy?: Credit[]
+  samples?: string[]
+  tags?: string[]
+}
+
+export type GztNomination = 'track_of_month' | 'track_of_year' | 'cover_of_month' | 'album_of_year'
+
 export type Artist = {
   id: string
   name: string
@@ -50,33 +60,39 @@ export type Track = {
   releaseId?: string
   /** ID авторизованного владельца пользовательского трека. */
   owner_id?: string
+  facts?: TrackFacts
 }
 
-// РЗТ-критерии оценки
-export type RztScore = {
-  text: number // Текст 1-10
-  structure: number // Структура / Ритмика 1-10
-  style: number // Реализация стиля 1-10
-  individuality: number // Индивидуальность / Харизма 1-10
-  atmosphere: number // Атмосфера / Вайб 1-5
-  trend: number // Трендовость 1-5
+// ГЗТ-критерии оценки: четыре базовых оси и единственный коэффициент восприятия.
+export type GztScore = {
+  text: number // Рифмы / Образы 1–10
+  structure: number // Структура / Ритмика 1–10
+  style: number // Реализация стиля 1–10
+  individuality: number // Индивидуальность / Харизма 1–10
+  atmosphere: number // Атмосфера / Вайб 1–5
 }
 
-export const RZT_CRITERIA = [
-  { key: 'text', label: 'Текст', max: 10 },
+export const GZT_CRITERIA = [
+  { key: 'text', label: 'Рифмы / Образы', max: 10 },
   { key: 'structure', label: 'Структура / Ритмика', max: 10 },
   { key: 'style', label: 'Реализация стиля', max: 10 },
   { key: 'individuality', label: 'Индивидуальность / Харизма', max: 10 },
   { key: 'atmosphere', label: 'Атмосфера / Вайб', max: 5 },
-  { key: 'trend', label: 'Трендовость', max: 5 },
 ] as const
 
-export const RZT_MAX = RZT_CRITERIA.reduce((s, c) => s + c.max, 0) // 50
+export const GZT_MAX = 90
+export const GZT_CORE_MAX = 40
 
-/** итоговый балл РЗТ по 10-балльной шкале */
-export function rztTotal(s: RztScore): number {
-  const sum = s.text + s.structure + s.style + s.individuality + s.atmosphere + s.trend
-  return Math.round((sum / RZT_MAX) * 100) / 10
+/** ГУЛ За Творчество: сумма четырёх базовых критериев × вайб/5 × 2.25, шкала 0–90. */
+export function gztTotal(score: GztScore): number {
+  const core = score.text + score.structure + score.style + score.individuality
+  return Math.round(core * (score.atmosphere / 5) * (GZT_MAX / GZT_CORE_MAX) * 10) / 10
+}
+
+export function gztCertification(score: number): 'diamond' | 'gold' | 'underground' {
+  if (score >= 85) return 'diamond'
+  if (score >= 70) return 'gold'
+  return 'underground'
 }
 
 export type Review = {
@@ -99,13 +115,13 @@ export type Release = {
   /** Пользовательский URL обложки, приоритетнее декоративного CoverKey. */
   coverUrl?: string
   artistIds: string[]
-  label?: string
+  nomination?: GztNomination | null
   weeksInChart?: number
   plays: number
   trackIds: string[]
   votes: number
   reviewCount: number
-  editorial: RztScore | null
+  editorial: GztScore | null
   /** распределение оценок слушателей по 10-балльным корзинам (10 → 1) */
   distribution: number[]
   reviews: Review[]
@@ -191,7 +207,7 @@ export const artists: Artist[] = [
     name: 'низкий сектор',
     initials: 'НС',
     color: 'g',
-    city: 'лейбл · Москва',
+    city: 'Москва',
     since: 2018,
     monthly: 58700,
     avg: 3.9,
@@ -263,6 +279,7 @@ export const tracks: Track[] = [
     cover: 'c1',
     hasLyrics: true,
     releaseId: 'steklovata',
+    facts: { producedBy: [A('nizkiy-sektor', 'prod')], writtenBy: [A('yegeor'), A('stilsi')], mixedMasteredBy: [{ artistId: null, name: 'low signal studio' }], samples: ['городской шум · field recording'], tags: ['гаражный рэп', 'лоу-фай', 'ночной город'] },
   },
   {
     id: 'skvoznyak-steklovata',
@@ -295,6 +312,7 @@ export const tracks: Track[] = [
     cover: 'c3',
     hasLyrics: true,
     releaseId: 'steklovata',
+    facts: { producedBy: [A('ozero')], writtenBy: [A('stilsi'), A('ozero', 'фит')], mixedMasteredBy: [{ artistId: null, name: 'ozero room' }], tags: ['эмбиент-рэп', 'холодный синт'] },
   },
   {
     id: 'net-seti-repriza',
@@ -462,7 +480,6 @@ export const releases: Release[] = [
     year: 2026,
     cover: 'c1',
     artistIds: ['yegeor', 'stilsi'],
-    label: 'НИЗКИЙ СЕКТОР',
     weeksInChart: 4,
     plays: 2418903,
     trackIds: [
@@ -478,7 +495,8 @@ export const releases: Release[] = [
     ],
     votes: 1204,
     reviewCount: 87,
-    editorial: { text: 8, structure: 7, style: 8, individuality: 9, atmosphere: 4, trend: 4 },
+    editorial: { text: 8, structure: 7, style: 8, individuality: 9, atmosphere: 4 },
+    nomination: 'album_of_year',
     distribution: [142, 238, 301, 196, 141, 74, 49, 28, 21, 14],
     reviews: [
       {
@@ -517,13 +535,13 @@ export const releases: Release[] = [
     year: 2025,
     cover: 'c3',
     artistIds: ['yegeor', 'stilsi'],
-    label: 'НИЗКИЙ СЕКТОР',
     weeksInChart: 1,
     plays: 511220,
     trackIds: ['net-seti-orig', 'fevral-kassette', 'pustoy-chat'],
     votes: 640,
     reviewCount: 31,
-    editorial: { text: 7, structure: 7, style: 7, individuality: 6, atmosphere: 4, trend: 3 },
+    editorial: { text: 7, structure: 7, style: 7, individuality: 6, atmosphere: 4 },
+    nomination: 'track_of_month',
     distribution: [61, 118, 142, 110, 84, 51, 34, 20, 12, 8],
     reviews: [
       {
@@ -544,12 +562,12 @@ export const releases: Release[] = [
     year: 2024,
     cover: 'c5',
     artistIds: ['yegeor'],
-    label: 'НИЗКИЙ СЕКТОР',
     plays: 1204880,
     trackIds: ['podval-gorit', 'plenka-rvetsya', 'garazh-title'],
     votes: 980,
     reviewCount: 44,
-    editorial: { text: 8, structure: 8, style: 9, individuality: 8, atmosphere: 5, trend: 4 },
+    editorial: { text: 8, structure: 8, style: 9, individuality: 8, atmosphere: 5 },
+    nomination: 'cover_of_month',
     distribution: [210, 260, 220, 130, 70, 40, 22, 14, 9, 5],
     reviews: [
       {
@@ -574,7 +592,7 @@ export const releases: Release[] = [
     trackIds: ['skvoznyak-pole', 'podval-live'],
     votes: 210,
     reviewCount: 12,
-    editorial: { text: 6, structure: 6, style: 7, individuality: 6, atmosphere: 3, trend: 3 },
+    editorial: { text: 6, structure: 6, style: 7, individuality: 6, atmosphere: 3 },
     distribution: [22, 40, 55, 42, 28, 18, 10, 6, 3, 2],
     reviews: [],
   },
@@ -771,7 +789,7 @@ export const workspaceCards: WorkspaceCard[] = [
     slug: 'nizkiy-sektor',
     initials: 'НС',
     color: 'g',
-    role: 'лейбл',
+    role: 'коллектив',
     access: 'owner',
     bio: 'Независимое творческое объединение.',
     tracks: 112,

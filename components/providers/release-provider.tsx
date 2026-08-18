@@ -1,7 +1,7 @@
 'use client'
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react'
-import { chart as seedChart, getTrack as getSeedTrack, releases as seedReleases, rztTotal, type ChartEntry, type CoverKey, type Credit, type Release, type RztScore, type Track } from '@/lib/data'
+import { chart as seedChart, getTrack as getSeedTrack, releases as seedReleases, gztTotal, type ChartEntry, type CoverKey, type Credit, type GztScore, type Release, type Track, type TrackFacts } from '@/lib/data'
 
 type PublishReleaseInput = {
   releaseTitle: string
@@ -14,6 +14,7 @@ type PublishReleaseInput = {
   durationSec: number
   audioUrl: string
   coverUrl?: string
+  facts?: TrackFacts
 }
 
 type PublishedRelease = { release: Release; track: Track }
@@ -25,7 +26,7 @@ type ReleaseStore = {
   hydrated: boolean
   getRelease: (id: string) => Release | undefined
   getTrack: (id: string) => Track | undefined
-  rateRelease: (releaseId: string, score: RztScore) => void
+  rateRelease: (releaseId: string, score: GztScore) => void
   publishRelease: (input: PublishReleaseInput) => PublishedRelease
 }
 
@@ -48,7 +49,7 @@ function mmss(seconds: number) {
   return `${Math.floor(safe / 60)}:${String(safe % 60).padStart(2, '0')}`
 }
 
-export function rztAverage(distribution: number[]) {
+export function gztAverage(distribution: number[]) {
   const votes = distribution.reduce((sum, count) => sum + count, 0)
   if (votes === 0) return 0
   return distribution.reduce((sum, count, index) => sum + (10 - index) * count, 0) / votes
@@ -76,9 +77,9 @@ export function ReleaseProvider({ children }: { children: React.ReactNode }) {
     if (hydrated) window.localStorage.setItem(STORAGE_KEY, JSON.stringify(state))
   }, [hydrated, state])
 
-  const rateRelease = useCallback((releaseId: string, score: RztScore) => {
-    const rating = rztTotal(score)
-    const bucket = Math.max(1, Math.min(10, Math.round(rating)))
+  const rateRelease = useCallback((releaseId: string, score: GztScore) => {
+    const rating = gztTotal(score)
+    const bucket = Math.max(1, Math.min(10, Math.round(rating / 9)))
     setState((previous) => {
       const releases = previous.releases.map((release) => {
         if (release.id !== releaseId) return release
@@ -88,7 +89,7 @@ export function ReleaseProvider({ children }: { children: React.ReactNode }) {
         return { ...release, votes: release.votes + 1, distribution }
       })
       const updatedRelease = releases.find((release) => release.id === releaseId)
-      const average = updatedRelease ? rztAverage(updatedRelease.distribution) : rating
+      const average = updatedRelease ? gztAverage(updatedRelease.distribution) : rating
       const chart = previous.chart.map((entry) => entry.releaseId === releaseId ? { ...entry, score: Math.round(average * 10) / 10, votes: updatedRelease?.votes ?? 0 } : entry)
       return { ...previous, releases, chart }
     })
@@ -112,6 +113,7 @@ export function ReleaseProvider({ children }: { children: React.ReactNode }) {
       hasLyrics: false,
       releaseId,
       owner_id: input.ownerId,
+      facts: input.facts,
     }
     const release: Release = {
       id: releaseId,

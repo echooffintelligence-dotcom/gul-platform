@@ -45,8 +45,9 @@ function isSnapshot(value: unknown): value is WorkspaceSnapshot {
 }
 
 function normalize(snapshot: WorkspaceSnapshot): WorkspaceSnapshot {
-  const activeId = snapshot.cards.some((card) => card.id === snapshot.activeId) ? snapshot.activeId : snapshot.cards[0].id
-  return { ...snapshot, activeId }
+  const cards = snapshot.cards.map((card) => card.role === 'лейбл' ? { ...card, role: 'коллектив' } : card)
+  const activeId = cards.some((card) => card.id === snapshot.activeId) ? snapshot.activeId : cards[0].id
+  return { ...snapshot, cards, activeId }
 }
 
 function initialsFor(name: string) {

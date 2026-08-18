@@ -1,6 +1,6 @@
 # ГУЛ
 
-«ГУЛ» — музыкальная платформа на **Next.js App Router**, TypeScript, Tailwind CSS, Supabase и Web Audio API. Проект сочетает премиальный dark cyber glassmorphism-интерфейс с offline-first хранением: плеер, lyrics, workspace, РЗТ и публикация остаются доступными, даже если сеть или Supabase временно недоступны.
+«ГУЛ» — музыкальная платформа на **Next.js App Router**, TypeScript, Tailwind CSS, Supabase и Web Audio API. Проект сочетает премиальный dark cyber glassmorphism-интерфейс с offline-first хранением: плеер, lyrics, workspace, ГЗТ, social-библиотека и публикация остаются доступными, даже если сеть или Supabase временно недоступны.
 
 ## Запуск
 
@@ -14,7 +14,7 @@ npm run dev
 Для production-проверки используйте:
 
 ```bash
-npx tsc --noEmit
+node ./node_modules/typescript/bin/tsc --noEmit
 npm run build
 npm run start
 ```
@@ -40,7 +40,7 @@ npm run start
 | Auth | `/api/auth/login`, `/api/auth/register`, `/api/auth/me`, `/api/auth/logout` |
 | Tracks | `/api/tracks` |
 | Releases | `/api/releases` |
-| РЗТ | `/api/rzt` |
+| ГЗТ | `/api/gzt` |
 | Workspace | `/api/workspace/sync` |
 
 Route handlers валидируют входные данные и возвращают offline-safe fallback-ответы. `owner_id` передаётся для всех новых карточек, треков и релизов; текущий in-memory adapter в `lib/server-api-store.ts` изолирован, поэтому его можно заменить на Node.js/Go/Python или Supabase database без переписывания UI.
@@ -53,6 +53,7 @@ Route handlers валидируют входные данные и возвра�
 | Workspace, активная карточка и snapshot | `gul.workspace.v3` |
 | Релизы, пользовательские треки и чарт | `gul.releases.v2` |
 | Синхронизация текста | `gul.lyrics.<trackId>.v1` |
+| Подписки, лайки, плейлисты и Blend | `gul.social.v2` |
 
 ## Supabase Workspace Sync
 

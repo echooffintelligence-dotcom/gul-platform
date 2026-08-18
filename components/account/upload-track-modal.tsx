@@ -12,6 +12,8 @@ import { apiClient } from '@/lib/api-client'
 
 const RELEASE_KINDS = ['сингл', 'EP', 'альбом'] as const
 const GENRES = ['хип-хоп', 'электроника', 'поп', 'рок', 'эмбиент', 'другое']
+const toCredits = (value: string) => value.split(',').map((name) => name.trim()).filter(Boolean).map((name) => ({ artistId: null, name }))
+const toList = (value: string) => value.split(',').map((item) => item.trim()).filter(Boolean)
 
 function readDuration(file: File): Promise<number> {
   return new Promise((resolve, reject) => {
@@ -67,6 +69,11 @@ export function UploadTrackModal() {
   const [trackTitle, setTrackTitle] = useState('')
   const [kind, setKind] = useState<(typeof RELEASE_KINDS)[number]>('сингл')
   const [genre, setGenre] = useState(GENRES[0])
+  const [producedBy, setProducedBy] = useState('')
+  const [writtenBy, setWrittenBy] = useState('')
+  const [mixedMasteredBy, setMixedMasteredBy] = useState('')
+  const [samples, setSamples] = useState('')
+  const [tags, setTags] = useState('')
   const [audioFile, setAudioFile] = useState<File | null>(null)
   const [coverFile, setCoverFile] = useState<File | null>(null)
   const [uploading, setUploading] = useState(false)
@@ -137,9 +144,10 @@ export function UploadTrackModal() {
         durationSec,
         audioUrl: audio.url,
         coverUrl,
+        facts: { producedBy: toCredits(producedBy), writtenBy: toCredits(writtenBy), mixedMasteredBy: toCredits(mixedMasteredBy), samples: toList(samples), tags: toList(tags) },
       })
       incrementActiveTracks()
-      void apiClient.tracks.upload({ id: track.id, title: track.title, owner_id: track.owner_id ?? 'local-anonymous', releaseId: track.releaseId, audioUrl: track.audioUrl, coverUrl: track.coverUrl, durationSec: track.durationSec })
+      void apiClient.tracks.upload({ id: track.id, title: track.title, owner_id: track.owner_id ?? 'local-anonymous', releaseId: track.releaseId, audioUrl: track.audioUrl, coverUrl: track.coverUrl, durationSec: track.durationSec, facts: track.facts })
       void apiClient.releases.create({ title: releaseTitle.trim(), owner_id: user?.id ?? 'local-anonymous', trackIds: [track.id], kind, genre })
       play({ ...track, audioUrl: track.audioUrl ?? audio.url, waveform })
       setProgress(100)
@@ -147,6 +155,11 @@ export function UploadTrackModal() {
       toast(fallbackNotice ? 'Файл опубликован локально: сеть недоступна' : 'Релиз опубликован')
       setReleaseTitle('')
       setTrackTitle('')
+      setProducedBy('')
+      setWrittenBy('')
+      setMixedMasteredBy('')
+      setSamples('')
+      setTags('')
       setAudioFile(null)
       setCoverFile(null)
     } catch (error) {
@@ -171,6 +184,8 @@ export function UploadTrackModal() {
           <label className="grid gap-1"><span className="font-mono text-xs text-ink-3">Тип релиза</span><select value={kind} onChange={(event) => setKind(event.target.value as (typeof RELEASE_KINDS)[number])} className="border border-ink-1 bg-transparent px-3 py-2 font-mono text-sm outline-none focus:border-ink">{RELEASE_KINDS.map((item) => <option key={item}>{item}</option>)}</select></label>
           <label className="grid gap-1"><span className="font-mono text-xs text-ink-3">Жанр</span><select value={genre} onChange={(event) => setGenre(event.target.value)} className="border border-ink-1 bg-transparent px-3 py-2 font-mono text-sm outline-none focus:border-ink">{GENRES.map((item) => <option key={item}>{item}</option>)}</select></label>
         </div>
+
+        <div className="rounded-xl border border-cyan-300/15 bg-cyan-300/[.025] p-3"><div className="eyebrow mb-3">создатели и факты · genius-style</div><div className="grid gap-3 sm:grid-cols-2"><label className="grid gap-1"><span className="font-mono text-xs text-ink-3">Продюсер / битмейкер</span><input value={producedBy} onChange={(event) => setProducedBy(event.target.value)} placeholder="имя, ещё имя" className="border border-ink-1 bg-transparent px-3 py-2 font-mono text-sm outline-none focus:border-ink" /></label><label className="grid gap-1"><span className="font-mono text-xs text-ink-3">Авторы текста</span><input value={writtenBy} onChange={(event) => setWrittenBy(event.target.value)} placeholder="имя, ещё имя" className="border border-ink-1 bg-transparent px-3 py-2 font-mono text-sm outline-none focus:border-ink" /></label><label className="grid gap-1"><span className="font-mono text-xs text-ink-3">Сведение / мастеринг</span><input value={mixedMasteredBy} onChange={(event) => setMixedMasteredBy(event.target.value)} placeholder="студия или специалист" className="border border-ink-1 bg-transparent px-3 py-2 font-mono text-sm outline-none focus:border-ink" /></label><label className="grid gap-1"><span className="font-mono text-xs text-ink-3">Сэмплы</span><input value={samples} onChange={(event) => setSamples(event.target.value)} placeholder="источник, источник" className="border border-ink-1 bg-transparent px-3 py-2 font-mono text-sm outline-none focus:border-ink" /></label><label className="grid gap-1 sm:col-span-2"><span className="font-mono text-xs text-ink-3">Теги / жанры трека</span><input value={tags} onChange={(event) => setTags(event.target.value)} placeholder="лоу-фай, гаражный рэп, ночной город" className="border border-ink-1 bg-transparent px-3 py-2 font-mono text-sm outline-none focus:border-ink" /></label></div></div>
 
         <div className="grid gap-3 sm:grid-cols-2">
           <div onDragOver={(event) => event.preventDefault()} onDrop={(event) => onDrop(event, 'audio')} onClick={() => audioInput.current?.click()} className="cursor-pointer border border-dashed border-ink-2 p-5 text-center transition-colors hover:border-ink">

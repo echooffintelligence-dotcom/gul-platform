@@ -2,21 +2,22 @@
 
 import Link from 'next/link'
 import { useMemo, useState } from 'react'
-import { ArrowDown, ArrowUp, Play, RotateCw } from 'lucide-react'
+import { ArrowDown, ArrowUp, Pause, Play, RotateCw } from 'lucide-react'
 import { usePlayer } from '@/components/providers/player-provider'
 import { useToast } from '@/components/providers/toast-provider'
 import { Cover } from '@/components/shared/art'
 import { Credits } from '@/components/shared/credits'
+import { TrackActions } from '@/components/social/track-actions'
 import { fmt, type ChartEntry } from '@/lib/data'
 import { useReleases } from '@/components/providers/release-provider'
 import { cn } from '@/lib/utils'
 
-type SortKey = 'day' | 'week' | 'rzt' | 'new'
+type SortKey = 'day' | 'week' | 'gzt' | 'new'
 
 const filters: { key: SortKey; label: string }[] = [
   { key: 'day', label: 'За 24 часа' },
   { key: 'week', label: 'За неделю' },
-  { key: 'rzt', label: 'Оценка РЗТ' },
+  { key: 'gzt', label: 'Оценка ГЗТ' },
   { key: 'new', label: 'Новинки' },
 ]
 
@@ -40,7 +41,7 @@ function Move({ move }: { move: number | 'new' }) {
 }
 
 export function ChartTable() {
-  const { current, playing, play } = usePlayer()
+  const { currentTrack, isPlaying, playTrack, pause, resume } = usePlayer()
   const { chart, getTrack } = useReleases()
   const { toast } = useToast()
   const [sort, setSort] = useState<SortKey>('week')
@@ -50,14 +51,19 @@ export function ChartTable() {
     const list = [...chart]
     if (sort === 'day') list.sort((a, b) => b.plays24 - a.plays24)
     if (sort === 'week') list.sort((a, b) => b.playsWeek - a.playsWeek)
-    if (sort === 'rzt') list.sort((a, b) => b.score - a.score)
+    if (sort === 'gzt') list.sort((a, b) => b.score - a.score)
     if (sort === 'new') list.sort((a, b) => (a.move === 'new' ? -1 : b.move === 'new' ? 1 : b.playsWeek - a.playsWeek))
     return list
   }, [sort])
 
   const playEntry = (e: ChartEntry) => {
+    const isCurrent = currentTrack.id === e.trackId
+    if (isCurrent) {
+      if (isPlaying) { pause(); toast(`Пауза: «${e.title}»`) } else { resume(); toast(`Продолжаем «${e.title}»`) }
+      return
+    }
     const t = getTrack(e.trackId)
-    play({
+    playTrack({
       id: e.trackId,
       title: e.title,
       credits: e.credits,
@@ -89,7 +95,7 @@ export function ChartTable() {
           <div className="eyebrow">неделя 11–17 августа</div>
           <h1 className="text-[clamp(2.25rem,5.5vw,3.5rem)] font-black uppercase leading-[0.95] [font-stretch:66%]">Чарт ГУЛа</h1>
           <p className="max-w-[52ch] text-[0.9375rem] text-ink-2">
-            Позиция считается по прослушиваниям и средней оценке РЗТ. Фиты идут двумя карточками, не одной — каждый автор кликабелен.
+            Позиция считается по прослушиваниям и средней оценке ГЗТ. Фиты идут двумя карточками, не одной — каждый автор кликабелен.
           </p>
         </div>
         <div className="ml-auto flex flex-wrap items-center gap-2">
@@ -106,7 +112,7 @@ export function ChartTable() {
         </div>
       </div>
 
-      <div className="grid grid-cols-[36px_44px_minmax(0,1fr)_112px_84px_36px] items-center gap-4 border-b border-ink px-2 pb-2 font-mono text-[0.625rem] uppercase tracking-[0.09em] text-ink-3 md:grid-cols-[44px_48px_minmax(0,1fr)_132px_96px_92px_36px]">
+      <div className="grid grid-cols-[36px_44px_minmax(0,1fr)_112px_84px_92px] items-center gap-4 border-b border-ink px-2 pb-2 font-mono text-[0.625rem] uppercase tracking-[0.09em] text-ink-3 md:grid-cols-[44px_48px_minmax(0,1fr)_132px_96px_92px_92px]">
         <div className="text-right">#</div>
         <div />
         <div>трек и все авторы</div>
@@ -119,7 +125,7 @@ export function ChartTable() {
       <div>
         {loading
           ? Array.from({ length: 6 }).map((_, i) => (
-              <div key={i} className="grid grid-cols-[36px_44px_minmax(0,1fr)_112px_84px_36px] items-center gap-4 border-b border-rule-soft px-2 py-3 md:grid-cols-[44px_48px_minmax(0,1fr)_132px_96px_92px_36px]">
+              <div key={i} className="grid grid-cols-[36px_44px_minmax(0,1fr)_112px_84px_92px] items-center gap-4 border-b border-rule-soft px-2 py-3 md:grid-cols-[44px_48px_minmax(0,1fr)_132px_96px_92px_92px]">
                 <div className="skel h-5" />
                 <div className="skel h-12" />
                 <div>
@@ -133,16 +139,17 @@ export function ChartTable() {
               </div>
             ))
           : rows.map((e, i) => {
-              const now = current.id === e.trackId && playing
+              const isCurrent = currentTrack.id === e.trackId
+              const isThisPlaying = isCurrent && isPlaying
               return (
                 <div
                   key={e.trackId}
                   className={cn(
-                    'group relative grid grid-cols-[36px_44px_minmax(0,1fr)_112px_84px_36px] items-center gap-4 border-b border-rule-soft px-2 py-3 transition-colors hover:bg-paper-2 md:grid-cols-[44px_48px_minmax(0,1fr)_132px_96px_92px_36px]',
-                    now && 'bg-paper-2',
+                    'group relative grid grid-cols-[36px_44px_minmax(0,1fr)_112px_84px_92px] items-center gap-4 border-b border-rule-soft px-2 py-3 transition-colors hover:bg-paper-2 md:grid-cols-[44px_48px_minmax(0,1fr)_132px_96px_92px_92px]',
+                    isThisPlaying && 'bg-paper-2',
                   )}
                 >
-                  <div className={cn('tabnum text-right font-mono text-[1.375rem] font-semibold text-ink-3 transition-colors group-hover:text-red', now && 'text-red')}>
+                  <div className={cn('tabnum text-right font-mono text-[1.375rem] font-semibold text-ink-3 transition-colors group-hover:text-red', isThisPlaying && 'text-red')}>
                     {i + 1}
                   </div>
                   <button type="button" onClick={() => playEntry(e)} aria-label={`Слушать ${e.title}`}>
@@ -153,7 +160,7 @@ export function ChartTable() {
                       <Link href={`/release/${e.releaseId}`} className="truncate hover:text-red">
                         {e.title}
                       </Link>
-                      {now && (
+                      {isThisPlaying && (
                         <span className="eq">
                           <i /><i /><i />
                         </span>
@@ -174,14 +181,7 @@ export function ChartTable() {
                   <div className="hidden md:block">
                     <Move move={e.move} />
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => playEntry(e)}
-                    aria-label={`Слушать ${e.title}`}
-                    className="grid h-7 w-7 place-items-center rounded-[2px] text-ink-3 opacity-0 transition-all hover:bg-ink hover:text-paper group-hover:opacity-100 group-focus-within:opacity-100"
-                  >
-                    <Play width={13} height={13} />
-                  </button>
+                  <div className="flex items-center justify-end"><TrackActions trackId={e.trackId} title={e.title} className="opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100" /><button type="button" onClick={() => playEntry(e)} aria-label={`Слушать ${e.title}`} className="grid h-7 w-7 place-items-center rounded-[2px] text-ink-3 opacity-0 transition-all hover:bg-ink hover:text-paper group-hover:opacity-100 group-focus-within:opacity-100">{isThisPlaying ? <Pause width={13} height={13} /> : <Play width={13} height={13} />}</button></div>
                 </div>
               )
             })}

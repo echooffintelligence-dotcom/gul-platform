@@ -1,24 +1,33 @@
 'use client'
 
+import { useState } from 'react'
 import Link from 'next/link'
 import { Bell } from 'lucide-react'
 import { Avatar, Cover } from '@/components/shared/art'
-import { useReleases, rztAverage } from '@/components/providers/release-provider'
-import { RztRating } from './rzt-rating'
-import { RatingHistogram } from './rating-histogram'
+import { useReleases, gztAverage } from '@/components/providers/release-provider'
+import { GztRating } from './gzt-rating'
 import { TrackList } from './track-list'
+import { TrackFactsPanel } from './track-facts-panel'
+import { AudioVisualizer } from '@/components/player/audio-visualizer'
+import { RepostButton } from '@/components/social/repost-button'
+import { CreatorSuite } from '@/components/creator/creator-suite'
 import { Reviews } from './reviews'
-import { fmt, getArtist, mmss, type Release } from '@/lib/data'
+import { fmt, getArtist, mmss, gztCertification, type Release } from '@/lib/data'
 
 export function ReleaseView({ releaseId, release: initialRelease }: { releaseId: string; release?: Release }) {
   const { getRelease, getTrack, hydrated } = useReleases()
+  const [showVisualizer, setShowVisualizer] = useState(true)
   const release = getRelease(releaseId) ?? initialRelease
   if (!release) return <div className="mx-auto max-w-[1180px] px-4 py-16 font-mono text-sm text-ink-3 sm:px-12">{hydrated ? 'Релиз не найден.' : 'Загружаем локальный каталог…'}</div>
   const tracks = release.trackIds.map((id) => getTrack(id)).filter((track): track is NonNullable<typeof track> => Boolean(track))
   const artistsResolved = release.artistIds.map((id) => getArtist(id)).filter((artist): artist is NonNullable<typeof artist> => Boolean(artist))
   const totalSec = tracks.reduce((sum, track) => sum + track.durationSec, 0)
-  const audienceAverage = rztAverage(release.distribution)
+  const factsTrack = tracks.find((track) => track.facts)
+  const audienceAverage = gztAverage(release.distribution)
   const rated = release.votes > 0
+  const gzt90 = audienceAverage * 9
+  const certification = gztCertification(gzt90)
+  const nominationLabels = { track_of_month: '👑 Трек месяца', track_of_year: '👑 Трек года', cover_of_month: '✦ Обложка месяца', album_of_year: '🏆 Альбом года' } as const
 
   return (
     <div className="mx-auto max-w-[1180px] px-4 py-8 sm:px-12 sm:pb-24">
@@ -26,26 +35,25 @@ export function ReleaseView({ releaseId, release: initialRelease }: { releaseId:
         <div className="grid gap-4 md:sticky md:top-0">
           <Cover cover={release.cover} coverUrl={release.coverUrl} className="aspect-square w-full" />
           <div className="border border-ink p-4">
-            <div className="eyebrow">средняя оценка слушателей · РЗТ</div>
+            <div className="eyebrow">средняя оценка слушателей · ГЗТ</div>
             {rated ? (
               <>
                 <div className="flex items-baseline">
                   <span className="tabnum font-mono text-[2.75rem] font-semibold leading-none tracking-[-0.03em]">{audienceAverage.toFixed(2)}</span>
-                  <span className="font-mono text-sm text-ink-3">/10</span>
+                  <span className="font-mono text-sm text-ink-3">/10 · {gzt90.toFixed(1)}/90</span>
                 </div>
                 <div className="eyebrow mt-1">{fmt(release.votes)} оценок · {release.reviewCount} рецензий</div>
-                <RatingHistogram distribution={release.distribution} />
               </>
             ) : (
               <p className="mt-2 text-[0.9375rem] text-ink-2">Оценок пока нет. Стань первым, кто разберёт релиз по критериям.</p>
             )}
           </div>
-          <RztRating releaseId={release.id} />
+          <GztRating releaseId={release.id} />
         </div>
 
         <div>
-          <div className="eyebrow">{release.kind} · {release.year}</div>
-          <h1 className="text-[clamp(2rem,4.4vw,3rem)] font-black uppercase leading-[0.94] [font-stretch:66%]">{release.title}</h1>
+          <div className="flex flex-wrap items-center gap-2"><div className="eyebrow">{release.kind} · {release.year}</div><span className={certification === 'diamond' ? 'chip done !border-cyan-200/50 !text-cyan-100' : certification === 'gold' ? 'chip !border-amber-300/40 !text-amber-100' : 'chip'}>{certification === 'diamond' ? '💎 Бриллиант ГУЛА' : certification === 'gold' ? '🏆 Золотой релиз' : '📦 Underground / Свежий звук'}</span>{release.nomination && <span className="chip !border-fuchsia-300/45 !bg-fuchsia-300/10 !text-fuchsia-100 shadow-[0_0_18px_rgba(232,121,249,.18)]">{nominationLabels[release.nomination]}</span>}</div>
+          <div className="flex flex-wrap items-start justify-between gap-3"><h1 className="text-[clamp(2rem,4.4vw,3rem)] font-black uppercase leading-[0.94] [font-stretch:66%]">{release.title}</h1><RepostButton releaseId={release.id} title={release.title} /></div>
 
           <div className="mt-3 inline-flex items-center gap-2 rounded-[2px] border border-ink py-[3px] pl-[3px] pr-2 text-[0.8125rem]">
             <span className="flex">
@@ -67,19 +75,17 @@ export function ReleaseView({ releaseId, release: initialRelease }: { releaseId:
             <div>{mmss(totalSec)} мин</div>
             <div>Прослушивания <b className="text-ink">{fmt(release.plays)}</b></div>
             {release.weeksInChart && <div>В чарте <b className="text-ink">{release.weeksInChart} недели</b></div>}
-            {release.label && <div>Лейбл <b className="text-ink">{release.label}</b></div>}
           </div>
 
+          <div className="mt-5 flex items-center justify-between gap-3"><div className="eyebrow">живой спектр · web audio</div><button type="button" className="ghost !px-3 !py-1.5 !text-xs" onClick={() => setShowVisualizer((value) => !value)}>{showVisualizer ? 'Скрыть визуализатор' : 'Показать визуализатор'}</button></div>
+          {showVisualizer && <AudioVisualizer />}
           <div className="section-h"><h3>Треки</h3><span className="line" /><span className="eyebrow">все авторы кликабельны</span></div>
           <TrackList tracks={tracks} />
+          <TrackFactsPanel track={factsTrack} />
+          <CreatorSuite releaseId={release.id} releaseTitle={release.title} />
 
           <div className="section-h"><h3>Рецензии</h3><span className="line" /><span className="eyebrow">{release.reviewCount}</span></div>
-          {release.reviews.length > 0 ? <Reviews reviews={release.reviews} /> : (
-            <div className="border border-dashed border-rule p-6 text-center text-ink-2">
-              <b className="mb-1 block [font-stretch:80%] text-ink">Рецензий пока нет</b>
-              <p className="mx-auto max-w-[44ch] text-sm">Будь первым — разбор появится здесь сразу после публикации.</p>
-            </div>
-          )}
+          <Reviews reviews={release.reviews} />
 
           <div className="section-h"><h3>Похожие релизы</h3><span className="line" /></div>
           <div className="border border-dashed border-rule p-6 text-center text-ink-2">

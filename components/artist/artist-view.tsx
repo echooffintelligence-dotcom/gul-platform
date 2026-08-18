@@ -1,14 +1,22 @@
 'use client'
 
 import Link from 'next/link'
-import { BadgeCheck, Play } from 'lucide-react'
+import { BadgeCheck, Pause, Play, UserCheck, UserPlus } from 'lucide-react'
 import { Avatar, Cover } from '@/components/shared/art'
 import { Credits } from '@/components/shared/credits'
 import { usePlayer } from '@/components/providers/player-provider'
+import { useSocial } from '@/components/providers/social-provider'
 import { fmt, getRelease, getTrack, mmss, type Artist } from '@/lib/data'
 
 export function ArtistView({ artist }: { artist: Artist }) {
-  const { play, current, playing } = usePlayer()
+  const { playTrack, currentTrack, isPlaying, pause, resume } = usePlayer()
+  const { isFollowing, toggleFollow } = useSocial()
+  const following = isFollowing(artist.id)
+  const activateTrack = (t: NonNullable<ReturnType<typeof getTrack>>) => {
+    const isCurrent = currentTrack.id === t.id
+    if (isCurrent) { if (isPlaying) pause(); else resume(); return }
+    playTrack({ id: t.id, title: t.title, credits: t.credits, cover: t.cover, coverUrl: t.coverUrl, durationSec: t.durationSec, audioUrl: t.audioUrl ?? '/audio/gul-demo.wav', waveform: t.waveform, releaseId: t.releaseId })
+  }
   const releases = artist.releaseIds.map((id) => getRelease(id)).filter((r): r is NonNullable<typeof r> => Boolean(r))
   const topTracks = releases
     .flatMap((r) => r.trackIds)
@@ -34,12 +42,13 @@ export function ArtistView({ artist }: { artist: Artist }) {
                 <span className="tabnum text-paper">{fmt(artist.monthly)}</span> слушателей / мес
               </span>
               <span>
-                средний РЗТ <span className="tabnum text-paper">{artist.avg.toFixed(2)}</span>
+                средний ГЗТ <span className="tabnum text-paper">{artist.avg.toFixed(2)}</span>
               </span>
               <span>
                 <span className="tabnum text-paper">{artist.tracks}</span> треков · с {artist.since}
               </span>
             </div>
+            <button type="button" onClick={() => toggleFollow(artist.id)} className={following ? 'mt-5 inline-flex items-center gap-2 border border-cyan-200/45 bg-cyan-300/10 px-3 py-2 font-mono text-xs text-cyan-50' : 'mt-5 inline-flex items-center gap-2 border border-paper/35 px-3 py-2 font-mono text-xs text-paper transition-colors hover:bg-paper hover:text-ink'}>{following ? <UserCheck className="h-3.5 w-3.5" /> : <UserPlus className="h-3.5 w-3.5" />}{following ? 'Вы подписаны' : 'Подписаться'}</button>
           </div>
         </div>
       </header>
@@ -51,7 +60,8 @@ export function ArtistView({ artist }: { artist: Artist }) {
             <h2 className="eyebrow mb-3">популярное</h2>
             <ol className="border-t border-ink-1">
               {topTracks.map((t, i) => {
-                const isCur = current?.id === t.id
+                const isCur = currentTrack.id === t.id
+                const isThisPlaying = isCur && isPlaying
                 return (
                   <li
                     key={t.id}
@@ -59,15 +69,11 @@ export function ArtistView({ artist }: { artist: Artist }) {
                   >
                     <button
                       type="button"
-                      onClick={() => play({ id: t.id, title: t.title, credits: t.credits, cover: t.cover, durationSec: t.durationSec, audioUrl: t.audioUrl ?? '/audio/gul-demo.wav', releaseId: t.releaseId })}
+                      onClick={() => activateTrack(t)}
                       aria-label={`Воспроизвести ${t.title}`}
                       className="flex h-8 w-8 shrink-0 items-center justify-center border border-ink text-ink transition-colors hover:bg-ink hover:text-paper"
                     >
-                      {isCur && playing ? (
-                        <span className="tabnum font-mono text-xs">||</span>
-                      ) : (
-                        <Play className="h-4 w-4" fill="currentColor" />
-                      )}
+                      {isThisPlaying ? <Pause className="h-4 w-4" fill="currentColor" /> : <Play className="h-4 w-4" fill="currentColor" />}
                     </button>
                     <span className="tabnum w-5 shrink-0 text-center font-mono text-sm text-ink-3">{i + 1}</span>
                     <Cover cover={t.cover} className="h-10 w-10 shrink-0" />

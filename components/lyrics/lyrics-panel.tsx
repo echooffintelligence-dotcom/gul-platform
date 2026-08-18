@@ -6,14 +6,18 @@ import { usePlayer } from '@/components/providers/player-provider'
 import { useToast } from '@/components/providers/toast-provider'
 import { Credits } from '@/components/shared/credits'
 import { mmss } from '@/lib/data'
+import { lyricsToPlainText, parseLrc } from '@/lib/lrc-parser'
 import { cn } from '@/lib/utils'
 
 export function LyricsPanel() {
-  const { current, time, lyrics, lyricsOpen, setLyricsOpen, editingLyrics, toggleEditing, setLyricsFromText, stampLine, jumpToLine } = usePlayer()
+  const { current, time, lyrics, lyricsOpen, setLyricsOpen, editingLyrics, toggleEditing, setLyricsFromText, setTimedLyrics, stampLine, jumpToLine } = usePlayer()
   const { toast } = useToast()
   const bodyRef = useRef<HTMLDivElement>(null)
   const [cursor, setCursor] = useState(0)
   const [draft, setDraft] = useState('')
+  const [searchedTrack, setSearchedTrack] = useState('')
+  const [suggestion, setSuggestion] = useState<{ syncedLyrics: string | null; plainLyrics: string | null; artistName: string } | null>(null)
+  const [searching, setSearching] = useState(false)
 
   const hasLyrics = lyrics.length > 0
 
@@ -21,6 +25,20 @@ export function LyricsPanel() {
     setDraft(lyrics.map((line) => line.text).join('\n'))
     setCursor(0)
   }, [current.id])
+
+  useEffect(() => {
+    if (!lyricsOpen || !editingLyrics || searchedTrack === current.id) return
+    const artistName = current.credits.map((credit) => credit.name).join(', ') || 'ГУЛ'
+    const controller = new AbortController()
+    setSearching(true)
+    setSearchedTrack(current.id)
+    void fetch(`/api/lyrics/search?track_name=${encodeURIComponent(current.title)}&artist_name=${encodeURIComponent(artistName)}`, { signal: controller.signal })
+      .then(async (response) => response.ok ? response.json() as Promise<{ found?: boolean; syncedLyrics?: string | null; plainLyrics?: string | null }> : null)
+      .then((result) => { if (result?.found) setSuggestion({ syncedLyrics: result.syncedLyrics ?? null, plainLyrics: result.plainLyrics ?? null, artistName }) })
+      .catch(() => undefined)
+      .finally(() => setSearching(false))
+    return () => controller.abort()
+  }, [current.credits, current.id, current.title, editingLyrics, lyricsOpen, searchedTrack])
 
   // активная строка = последняя со временем <= текущему
   let active = -1
@@ -50,7 +68,7 @@ export function LyricsPanel() {
   useEffect(() => {
     if (!editingLyrics || !lyricsOpen) return
     const onKey = (e: KeyboardEvent) => {
-      if (e.code === 'Space') {
+      if (e.code === 'Space' || e.key === 'Enter') {
         const tag = (e.target as HTMLElement)?.tagName
         if (tag === 'INPUT' || tag === 'TEXTAREA') return
         e.preventDefault()
@@ -72,7 +90,7 @@ export function LyricsPanel() {
     >
       <div className="flex items-start gap-3 border-b border-rule px-5 py-4">
         <div className="min-w-0">
-          <div className="eyebrow">текст · {editingLyrics ? 'разметка' : hasLyrics ? 'синхронизирован' : 'нет текста'}</div>
+          <div className="eyebrow">текст · {editingLyrics ? 'разметка' : hasLyrics ? 'синхронизирован' : 'нет текста'}{searching ? ' · поиск…' : ''}</div>
           <h3 className="truncate text-[1.0625rem] [font-stretch:80%]">{current.title}</h3>
           <Credits credits={current.credits} className="mt-1" />
         </div>
@@ -134,6 +152,7 @@ export function LyricsPanel() {
         })}
       </div>
 
+      {suggestion && <div role="dialog" aria-label="Предложение текста" className="absolute inset-x-4 top-20 z-50 rounded-2xl border border-cyan-300/30 bg-slate-950/95 p-4 shadow-2xl backdrop-blur-xl"><div className="eyebrow">smart lyrics engine</div><h4 className="mt-1 font-semibold">Найден текст для «{current.title}»</h4><p className="mt-1 text-sm text-ink-2">Проверьте источник и выберите способ применения. Автор всегда может оставить свой текст.</p><div className="mt-3 grid gap-2">{suggestion.syncedLyrics && <button type="button" onClick={() => { const lines = parseLrc(suggestion.syncedLyrics ?? ''); setTimedLyrics(lines); setDraft(lyricsToPlainText(lines)); setCursor(0); setSuggestion(null); toast('LRC применён: караоке-тайминги сохранены') }} className="solid justify-center">Применить с таймингами (LRC)</button>}{suggestion.plainLyrics && <button type="button" onClick={() => { setDraft(suggestion.plainLyrics ?? ''); setLyricsFromText(suggestion.plainLyrics ?? ''); setCursor(0); setSuggestion(null); toast('Текст вставлен для ручной синхронизации') }} className="ghost justify-center">Вставить только текст</button>}<button type="button" onClick={() => { setDraft(''); setLyricsFromText(''); setSuggestion(null); toast('Пустой редактор готов для авторского текста') }} className="ghost justify-center">Написать свой</button></div></div>}
       <div className="flex items-center gap-3 border-t border-rule px-5 py-3">
         <button
           type="button"

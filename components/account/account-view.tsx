@@ -6,10 +6,14 @@ import { Check, Clock, Plus, Users, X } from 'lucide-react'
 import { Avatar } from '@/components/shared/art'
 import { useWorkspace } from '@/components/providers/workspace-provider'
 import { useToast } from '@/components/providers/toast-provider'
-import { ACCOUNT, getArtist, type AvColor, type CardShare } from '@/lib/data'
+import { ACCOUNT, getArtist, getRelease, type AvColor, type CardShare } from '@/lib/data'
 import { UploadTrackModal } from './upload-track-modal'
+import { SpotlightManager } from '@/components/creator/spotlight-manager'
+import { ActivityFeed } from '@/components/social/activity-feed'
+import { SocialLibrary } from '@/components/social/social-library'
+import { BlendCreator } from '@/components/social/blend-creator'
 
-const ROLES = ['основная', 'сайд-проект', 'лейбл', 'псевдоним']
+const ROLES = ['основная', 'сайд-проект', 'коллектив', 'псевдоним']
 const COLORS: { value: AvColor; label: string }[] = [
   { value: 'r', label: 'красный' },
   { value: 'b', label: 'синий' },
@@ -35,6 +39,8 @@ export function AccountView() {
   const [shareError, setShareError] = useState('')
 
   const sharingCard = cards.find((card) => card.id === sharingId)
+  const activeArtist = getArtist(activeId)
+  const activeReleases = activeArtist?.releaseIds.map((id) => getRelease(id)).filter((release): release is NonNullable<typeof release> => Boolean(release)) ?? []
 
   function resetForm() {
     setName('')
@@ -106,7 +112,7 @@ export function AccountView() {
                   </div>
                   <div className="font-mono text-xs opacity-70">{card.role} · {card.tracks} треков · {card.listeners} слуш.</div>
                   <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 font-mono text-xs">
-                    {isActive ? <span className="tabnum opacity-70">активна · РЗТ {card.score}</span> : <button type="button" onClick={() => { setActive(card.id); toast(`Переключено на «${card.name}»`) }} className="underline underline-offset-2 hover:text-accent-r">сделать активной</button>}
+                    {isActive ? <span className="tabnum opacity-70">активна · ГЗТ {card.score}</span> : <button type="button" onClick={() => { setActive(card.id); toast(`Переключено на «${card.name}»`) }} className="underline underline-offset-2 hover:text-accent-r">сделать активной</button>}
                     {hasPage && <Link href={`/artist/${card.id}`} className="underline underline-offset-2 hover:text-accent-r">открыть страницу</Link>}
                     {card.access === 'owner' && <button type="button" onClick={() => { setSharingId(card.id); setShareError('') }} className="underline underline-offset-2 hover:text-accent-r">доступ ({card.shares?.length ?? 0})</button>}
                   </div>
@@ -133,6 +139,11 @@ export function AccountView() {
           ) : <button type="button" disabled={!canEditActive} onClick={() => setOpen(true)} className="flex w-full items-center justify-center gap-2 border border-dashed border-ink-2 py-4 font-mono text-sm text-ink-3 transition-colors hover:border-ink hover:text-ink disabled:cursor-not-allowed disabled:opacity-50"><Plus className="h-4 w-4" /> {canEditActive ? 'добавить карточку' : 'viewer: создание недоступно'}</button>}
         </div>
       </section>
+
+      {activeArtist && <SpotlightManager artistId={activeArtist.id} releases={activeReleases} />}
+      <SocialLibrary />
+      <BlendCreator />
+      <ActivityFeed />
 
       {sharingCard && (
         <section className="mt-8 border border-ink p-4" aria-labelledby="sharing-title">

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import type { ApiTrack } from '@/lib/api-client'
+import type { TrackFacts } from '@/lib/data'
 import { asText, createId, isRecord, tracksStore } from '@/lib/server-api-store'
 
 function json(data: unknown, init?: ResponseInit) {
@@ -21,10 +22,11 @@ export async function POST(request: NextRequest) {
   const ownerId = asText(payload.owner_id, 120)
   if (!title || !ownerId) return json({ error: 'Название и owner_id обязательны.' }, { status: 422 })
   const duration = typeof payload.durationSec === 'number' && Number.isFinite(payload.durationSec) ? Math.max(0, Math.round(payload.durationSec)) : undefined
+  const facts = isRecord(payload.facts) ? payload.facts as TrackFacts : undefined
   const track: ApiTrack = {
     id: asText(payload.id, 160) || createId('track'), title, owner_id: ownerId, releaseId: asText(payload.releaseId, 120) || undefined,
     audioUrl: asText(payload.audioUrl, 2_000) || undefined, coverUrl: asText(payload.coverUrl, 2_000) || undefined,
-    durationSec: duration, createdAt: new Date().toISOString(),
+    durationSec: duration, facts, createdAt: new Date().toISOString(),
   }
   tracksStore.set(track.id, track)
   return json({ track, fallback: true }, { status: 201 })
