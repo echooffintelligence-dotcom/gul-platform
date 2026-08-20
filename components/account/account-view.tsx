@@ -7,8 +7,10 @@ import { Avatar } from '@/components/shared/art'
 import { useWorkspace } from '@/components/providers/workspace-provider'
 import { useToast } from '@/components/providers/toast-provider'
 import { ACCOUNT, getArtist, getRelease, type AvColor, type CardShare } from '@/lib/data'
+import { cn } from '@/lib/utils'
 import { UploadTrackModal } from './upload-track-modal'
 import { SpotlightManager } from '@/components/creator/spotlight-manager'
+import { ArtistLinksEditor } from '@/components/artist/artist-links-editor'
 import { ActivityFeed } from '@/components/social/activity-feed'
 import { SocialLibrary } from '@/components/social/social-library'
 import { BlendCreator } from '@/components/social/blend-creator'
@@ -103,7 +105,7 @@ export function AccountView() {
             const isActive = card.id === activeId
             const hasPage = Boolean(getArtist(card.id))
             return (
-              <li key={card.id} data-active={isActive} className="flex items-center gap-4 border border-ink-1 p-4 data-[active=true]:border-ink data-[active=true]:bg-ink data-[active=true]:text-paper">
+              <li key={card.id} className={cn('flex items-center gap-4 rounded-xl border border-ink-1 p-4 transition-colors', isActive && 'is-selected bg-ink text-paper')}>
                 <Avatar initials={card.initials} color={card.color} className="h-12 w-12 shrink-0 text-xl" />
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2">
@@ -141,6 +143,7 @@ export function AccountView() {
       </section>
 
       {activeArtist && <SpotlightManager artistId={activeArtist.id} releases={activeReleases} />}
+      <ArtistLinksEditor artistId={activeId} />
       <SocialLibrary />
       <BlendCreator />
       <ActivityFeed />

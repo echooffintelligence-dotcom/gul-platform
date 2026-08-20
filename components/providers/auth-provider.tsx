@@ -3,6 +3,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react'
 import type { Session, User } from '@supabase/supabase-js'
 import { getSupabaseAuthClient } from '@/lib/supabase-auth'
+import { setAccessToken } from '@/lib/api-client'
 
 type LocalSession = {
   mode: 'local'
@@ -21,6 +22,13 @@ export type AuthIdentity = {
 type AuthContextValue = {
   user: AuthIdentity | null
   session: Session | LocalSession | null
+  /**
+   * Настоящий JWT Supabase — или null. У локальной fallback-сессии токена нет:
+   * её «accessToken» это случайный uuid, и отправлять его на сервер бессмысленно.
+   * Поэтому в fallback-режиме запись на сервер недоступна, а работа продолжается
+   * локально. Это осознанный размен: иначе поддельная сессия писала бы в общие данные.
+   */
+  accessToken: string | null
   isLoading: boolean
   isFallback: boolean
   signUp: (email: string, password: string, username: string) => Promise<{ error?: string; fallback?: boolean }>
@@ -215,7 +223,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setIsFallback(false)
   }, [])
 
-  const value = useMemo<AuthContextValue>(() => ({ user, session, isLoading, isFallback, signUp, signIn, signOut }), [user, session, isLoading, isFallback, signUp, signIn, signOut])
+  const accessToken = useMemo(() => {
+    if (!session) return null
+    return 'mode' in session && session.mode === 'local' ? null : (session as Session).access_token ?? null
+  }, [session])
+
+  // Один источник истины о токене: api-client подставляет его в каждый запрос,
+  // поэтому ни один вызывающий код не обязан помнить про заголовок.
+  useEffect(() => { setAccessToken(accessToken) }, [accessToken])
+
+  const value = useMemo<AuthContextValue>(() => ({ user, session, accessToken, isLoading, isFallback, signUp, signIn, signOut }), [user, session, accessToken, isLoading, isFallback, signUp, signIn, signOut])
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
 }
 

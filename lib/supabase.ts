@@ -1,4 +1,5 @@
 import type { WorkspaceCard } from '@/lib/data'
+import { supabaseConfig } from '@/lib/supabase-config'
 
 export type WorkspaceSnapshot = {
   cards: WorkspaceCard[]
@@ -11,10 +12,8 @@ type WorkspaceRow = {
   updated_at?: unknown
 }
 
-const configuredUrl = process.env.NEXT_PUBLIC_SUPABASE_URL ?? 'https://tpuoxbvlzgofqzfyoene.supabase.co'
-const configuredAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? 'sb_publishable_h23HgO70CV2Q4a7XdXraEg_O9AVZlXx'
-const baseUrl = configuredUrl.replace(/\/$/, '')
-const snapshotId = 'gul-local-demo'
+const baseUrl = supabaseConfig.url
+const anonKey = supabaseConfig.anonKey
 const DEFAULT_TIMEOUT_MS = 8_000
 
 function withTimeout(timeoutMs = DEFAULT_TIMEOUT_MS) {
@@ -29,16 +28,22 @@ function isWorkspaceSnapshot(value: unknown): value is WorkspaceSnapshot {
   return Array.isArray(candidate.cards) && typeof candidate.activeId === 'string' && typeof candidate.updatedAt === 'string'
 }
 
-async function request(path: string, init: RequestInit, timeoutMs?: number): Promise<Response | null> {
-  if (!baseUrl || !configuredAnonKey) return null
+/**
+ * Запрос к Supabase от имени пользователя.
+ *
+ * accessToken обязателен для всего, что пишет данные: под анонимным ключом RLS
+ * не пропустит вставку, и это правильно — иначе чужой снапшот можно перезаписать.
+ */
+async function request(path: string, init: RequestInit, accessToken?: string | null, timeoutMs?: number): Promise<Response | null> {
+  if (!baseUrl || !anonKey) return null
   const { signal, clear } = withTimeout(timeoutMs)
   try {
     const response = await fetch(`${baseUrl}${path}`, {
       ...init,
       signal,
       headers: {
-        apikey: configuredAnonKey,
-        Authorization: `Bearer ${configuredAnonKey}`,
+        apikey: anonKey,
+        Authorization: `Bearer ${accessToken || anonKey}`,
         ...(init.headers ?? {}),
       },
       cache: 'no-store',
@@ -56,16 +61,23 @@ function encodePath(path: string) {
 }
 
 export const supabase = {
-  enabled: Boolean(baseUrl && configuredAnonKey),
+  enabled: supabaseConfig.enabled,
   baseUrl,
-  anonKey: configuredAnonKey,
+  anonKey,
   publicUrl(bucket: 'audio' | 'covers', path: string) {
     return `${baseUrl}/storage/v1/object/public/${bucket}/${encodePath(path)}`
   },
-  async loadWorkspace(): Promise<WorkspaceSnapshot | null> {
-    const response = await request(`/rest/v1/workspace_snapshots?id=eq.${encodeURIComponent(snapshotId)}&select=payload,updated_at`, { method: 'GET' })
+
+  /** Снапшот рабочего пространства принадлежит конкретному пользователю. */
+  async loadWorkspace(ownerId: string, accessToken?: string | null): Promise<WorkspaceSnapshot | null> {
+    if (!ownerId || !accessToken) return null
+    const response = await request(
+      `/rest/v1/workspace_snapshots?owner_id=eq.${encodeURIComponent(ownerId)}&select=payload,updated_at`,
+      { method: 'GET' },
+      accessToken,
+    )
     if (!response) return null
-    const rows: unknown = await response.json()
+    const rows: unknown = await response.json().catch(() => null)
     if (!Array.isArray(rows) || rows.length === 0) return null
     const row = rows[0] as WorkspaceRow
     if (!isWorkspaceSnapshot(row.payload)) return null
@@ -73,26 +85,38 @@ export const supabase = {
     const updatedAt = typeof row.updated_at === 'string' ? row.updated_at : snapshot.updatedAt
     return { ...snapshot, updatedAt }
   },
-  async saveWorkspace(snapshot: WorkspaceSnapshot): Promise<boolean> {
-    const response = await request('/rest/v1/workspace_snapshots?on_conflict=id', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Prefer: 'resolution=merge-duplicates,return=minimal',
+
+  async saveWorkspace(snapshot: WorkspaceSnapshot, ownerId: string, accessToken?: string | null): Promise<boolean> {
+    if (!ownerId || !accessToken) return false
+    const response = await request(
+      '/rest/v1/workspace_snapshots?on_conflict=owner_id',
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates,return=minimal' },
+        body: JSON.stringify({ owner_id: ownerId, payload: snapshot, updated_at: snapshot.updatedAt }),
       },
-      body: JSON.stringify({ id: snapshotId, payload: snapshot, updated_at: snapshot.updatedAt }),
-    })
+      accessToken,
+    )
     return Boolean(response)
   },
-  async upload(bucket: 'audio' | 'covers', path: string, file: File): Promise<string | null> {
-    const response = await request(`/storage/v1/object/${bucket}/${encodePath(path)}`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': file.type || 'application/octet-stream',
-        'x-upsert': 'false',
+
+  /**
+   * Файл кладётся в личную папку пользователя: <uid>/<folder>/<uuid>.<ext>.
+   * Политика Storage сверяет первый сегмент пути с auth.uid(), поэтому писать
+   * в чужую папку нельзя даже при полном контроле над клиентом.
+   */
+  async upload(bucket: 'audio' | 'covers', path: string, file: File, accessToken?: string | null): Promise<string | null> {
+    if (!accessToken) return null
+    const response = await request(
+      `/storage/v1/object/${bucket}/${encodePath(path)}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': file.type || 'application/octet-stream', 'x-upsert': 'false' },
+        body: file,
       },
-      body: file,
-    }, 20_000)
+      accessToken,
+      20_000,
+    )
     return response ? this.publicUrl(bucket, path) : null
   },
 }

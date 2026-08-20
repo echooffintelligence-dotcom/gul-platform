@@ -29,7 +29,12 @@ type WorkspaceContextType = {
   incrementActiveTracks: () => void
 }
 
-const STORAGE_KEY = 'gul.workspace.v3'
+/**
+ * Ключ хранения привязан к пользователю: на общем компьютере рабочее
+ * пространство одного аккаунта больше не подхватывается другим.
+ */
+const storageKeyFor = (userId?: string | null) => (userId ? `gul.workspace.v4.${userId}` : 'gul.workspace.v4.guest')
+const LEGACY_STORAGE_KEY = 'gul.workspace.v3'
 const slugPattern = /^[a-z0-9]+(?:-[a-z0-9]+)*$/
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 const Ctx = createContext<WorkspaceContextType | null>(null)
@@ -55,11 +60,12 @@ function initialsFor(name: string) {
 }
 
 export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
-  const { user } = useAuth()
+  const { user, accessToken } = useAuth()
   const [snapshot, setSnapshot] = useState<WorkspaceSnapshot>(seedSnapshot)
   const [loading, setLoading] = useState(true)
   const syncReady = useRef(false)
   const snapshotRef = useRef(snapshot)
+  const storageKey = storageKeyFor(user?.id)
 
   useEffect(() => { snapshotRef.current = snapshot }, [snapshot])
 
@@ -69,41 +75,46 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     let mounted = true
+    syncReady.current = false
     let local = seedSnapshot()
     try {
-      const raw = window.localStorage.getItem(STORAGE_KEY)
+      const raw = window.localStorage.getItem(storageKey) ?? window.localStorage.getItem(LEGACY_STORAGE_KEY)
       if (raw) {
         const stored: unknown = JSON.parse(raw)
         if (isSnapshot(stored)) local = normalize(stored)
       }
     } catch {
-      window.localStorage.removeItem(STORAGE_KEY)
+      window.localStorage.removeItem(storageKey)
     }
     setSnapshot(local)
     setLoading(false)
 
-    void supabase.loadWorkspace().then((remote) => {
+    // Синхронизация с сервером возможна только для настоящей сессии: у локального
+    // fallback нет JWT, поэтому его данные остаются в браузере и никуда не уезжают.
+    if (!user?.id || !accessToken) return () => { mounted = false }
+
+    void supabase.loadWorkspace(user.id, accessToken).then((remote) => {
       if (!mounted) return
       const latest = snapshotRef.current
       const remoteIsNewer = remote && Date.parse(remote.updatedAt) > Date.parse(latest.updatedAt)
       if (remoteIsNewer && remote) {
         setSnapshot(normalize(remote))
       } else {
-        void supabase.saveWorkspace(latest)
+        void supabase.saveWorkspace(latest, user.id, accessToken)
       }
       syncReady.current = true
     })
 
     return () => { mounted = false }
-  }, [])
+  }, [storageKey, user?.id, accessToken])
 
   useEffect(() => {
     if (loading) return
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(snapshot))
-    if (!syncReady.current) return
-    const timer = window.setTimeout(() => { void supabase.saveWorkspace(snapshot) }, 500)
+    window.localStorage.setItem(storageKey, JSON.stringify(snapshot))
+    if (!syncReady.current || !user?.id || !accessToken) return
+    const timer = window.setTimeout(() => { void supabase.saveWorkspace(snapshot, user.id, accessToken) }, 500)
     return () => window.clearTimeout(timer)
-  }, [snapshot, loading])
+  }, [snapshot, loading, storageKey, user?.id, accessToken])
 
   const active = useMemo(() => snapshot.cards.find((card) => card.id === snapshot.activeId) ?? snapshot.cards[0], [snapshot])
   const canEditActive = active.access !== 'viewer'

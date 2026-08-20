@@ -61,6 +61,26 @@ export type Track = {
   /** ID авторизованного владельца пользовательского трека. */
   owner_id?: string
   facts?: TrackFacts
+  /** Приглашённые артисты в порядке показа: `Артист feat. … — Трек`. */
+  featuring?: string[]
+  /** Трек создан с помощью ИИ (Suno, Udio и подобные генераторы). */
+  isAiGenerated?: boolean
+}
+
+/**
+ * Произвольная ссылка в профиле артиста.
+ *
+ * Заменяет прежний жёсткий набор vk / telegram / bandcamp / boosty / spotify:
+ * артист сам решает, куда ведут ссылки и как они подписаны.
+ */
+export type ArtistLink = {
+  id: string
+  /** Адрес сайта или email — сохраняется как ввёл пользователь. */
+  url: string
+  /** Короткая подпись для бейджа. Пустая — покажем домен. */
+  title: string
+  /** 'support' — ссылка на донат или поддержку, показывается отдельной группой. */
+  kind: 'link' | 'support'
 }
 
 // ГЗТ-критерии оценки: четыре базовых оси и единственный коэффициент восприятия.
@@ -620,6 +640,8 @@ export type ChartEntry = {
   trackId: string
   title: string
   credits: Credit[]
+  /** Приглашённые артисты для каноничной строки фита. */
+  featuring?: string[]
   cover: CoverKey
   coverUrl?: string
   score: number

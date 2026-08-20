@@ -1,13 +1,15 @@
 'use client'
 
-import Link from 'next/link'
+
 import { useMemo, useState } from 'react'
 import { ArrowDown, ArrowUp, Pause, Play, RotateCw } from 'lucide-react'
 import { usePlayer } from '@/components/providers/player-provider'
 import { useToast } from '@/components/providers/toast-provider'
 import { Cover } from '@/components/shared/art'
-import { Credits } from '@/components/shared/credits'
+import { TrackTitle } from '@/components/shared/track-title'
+
 import { TrackActions } from '@/components/social/track-actions'
+import { AiBadge } from '@/components/shared/ai-badge'
 import { fmt, type ChartEntry } from '@/lib/data'
 import { useReleases } from '@/components/providers/release-provider'
 import { cn } from '@/lib/utils'
@@ -54,7 +56,10 @@ export function ChartTable() {
     if (sort === 'gzt') list.sort((a, b) => b.score - a.score)
     if (sort === 'new') list.sort((a, b) => (a.move === 'new' ? -1 : b.move === 'new' ? 1 : b.playsWeek - a.playsWeek))
     return list
-  }, [sort])
+    // chart обязан быть в зависимостях: без него мемо держит чарт, захваченный
+    // до гидратации, и только что опубликованный трек не появляется в таблице,
+    // пока не переключишь фильтр.
+  }, [chart, sort])
 
   const playEntry = (e: ChartEntry) => {
     const isCurrent = currentTrack.id === e.trackId
@@ -67,12 +72,14 @@ export function ChartTable() {
       id: e.trackId,
       title: e.title,
       credits: e.credits,
+      featuring: t?.featuring ?? e.featuring,
       cover: e.cover,
       coverUrl: t?.coverUrl ?? e.coverUrl,
       durationSec: t?.durationSec ?? 18,
       audioUrl: t?.audioUrl ?? '/audio/gul-demo.wav',
       waveform: t?.waveform,
       releaseId: e.releaseId,
+      isAiGenerated: t?.isAiGenerated,
     })
     toast(`Играет «${e.title}»`)
   }
@@ -146,28 +153,26 @@ export function ChartTable() {
                   key={e.trackId}
                   className={cn(
                     'group relative grid grid-cols-[36px_44px_minmax(0,1fr)_112px_84px_92px] items-center gap-4 border-b border-rule-soft px-2 py-3 transition-colors hover:bg-paper-2 md:grid-cols-[44px_48px_minmax(0,1fr)_132px_96px_92px_92px]',
-                    isThisPlaying && 'bg-paper-2',
+                    isCurrent && 'is-selected rounded-lg bg-paper-2',
                   )}
                 >
                   <div className={cn('tabnum text-right font-mono text-[1.375rem] font-semibold text-ink-3 transition-colors group-hover:text-red', isThisPlaying && 'text-red')}>
                     {i + 1}
                   </div>
                   <button type="button" onClick={() => playEntry(e)} aria-label={`Слушать ${e.title}`}>
-                    <Cover cover={e.cover} coverUrl={e.coverUrl} className="h-12 w-12" />
+                    <Cover cover={e.cover} coverUrl={e.coverUrl} className={cn('h-12 w-12', isCurrent && 'is-selected-cover')} />
                   </button>
-                  <div className="min-w-0">
-                    <div className="flex items-center truncate text-[1.0625rem] font-bold [font-stretch:84%]">
-                      <Link href={`/release/${e.releaseId}`} className="truncate hover:text-red">
-                        {e.title}
-                      </Link>
-                      {isThisPlaying && (
-                        <span className="eq">
-                          <i /><i /><i />
-                        </span>
-                      )}
+                    <div className="min-w-0">
+                      <div className="flex items-center truncate text-[1.0625rem] font-bold [font-stretch:84%]">
+                        <TrackTitle title={e.title} credits={e.credits} featuring={getTrack(e.trackId)?.featuring ?? e.featuring} trackHref={`/release/${e.releaseId}`} className="truncate" artistClassName="text-ink-2" titleClassName="font-bold" />
+                        {isThisPlaying && (
+                          <span className="eq">
+                            <i /><i /><i />
+                          </span>
+                        )}
+                        {getTrack(e.trackId)?.isAiGenerated && <AiBadge compact className="ml-2" />}
+                      </div>
                     </div>
-                    <Credits credits={e.credits} />
-                  </div>
                   <div>
                     <div className="flex items-baseline gap-2">
                       <b className="tabnum font-mono text-[1.0625rem] font-semibold">{e.score.toFixed(1)}</b>

@@ -15,6 +15,8 @@ type PublishReleaseInput = {
   audioUrl: string
   coverUrl?: string
   facts?: TrackFacts
+  featuring?: string[]
+  isAiGenerated?: boolean
 }
 
 type PublishedRelease = { release: Release; track: Track }
@@ -114,6 +116,8 @@ export function ReleaseProvider({ children }: { children: React.ReactNode }) {
       releaseId,
       owner_id: input.ownerId,
       facts: input.facts,
+      featuring: input.featuring,
+      isAiGenerated: input.isAiGenerated ?? false,
     }
     const release: Release = {
       id: releaseId,
@@ -134,7 +138,7 @@ export function ReleaseProvider({ children }: { children: React.ReactNode }) {
       owner_id: input.ownerId,
     }
     const entry: ChartEntry = {
-      trackId, title: track.title, credits, cover, coverUrl: input.coverUrl, score: 0, votes: 0, plays24: 0, playsWeek: 0, move: 'new', releaseId, fresh: true,
+      trackId, title: track.title, credits, featuring: input.featuring, cover, coverUrl: input.coverUrl, score: 0, votes: 0, plays24: 0, playsWeek: 0, move: 'new', releaseId, fresh: true,
     }
     setState((previous) => ({ releases: [release, ...previous.releases], chart: [entry, ...previous.chart], customTracks: [track, ...previous.customTracks] }))
     return { release, track }

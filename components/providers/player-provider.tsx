@@ -2,7 +2,10 @@
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import type { CoverKey, Credit, LyricLine, Track } from '@/lib/data'
-import { chart, getTrack, lyricsByTrack } from '@/lib/data'
+import { chart, getTrack, lyricsByTrack, tracks as seedTracks } from '@/lib/data'
+import { recommendTracks } from '@/lib/recommend'
+import { useReleases } from '@/components/providers/release-provider'
+import { useSocial } from '@/components/providers/social-provider'
 
 const AUDIO_FALLBACK = '/audio/gul-demo.wav'
 const lyricsStorageKey = (trackId: string) => `gul.lyrics.${trackId}.v1`
@@ -12,12 +15,15 @@ export type NowPlaying = {
   id: string
   title: string
   credits: Credit[]
+  featuring?: string[]
   cover: CoverKey
   coverUrl?: string
   durationSec: number
   audioUrl: string
   waveform?: number[]
   releaseId?: string
+  /** Показывает бейдж 🤖 AI в плеере. */
+  isAiGenerated?: boolean
 }
 
 export type TimedComment = {
@@ -45,6 +51,8 @@ type PlayerState = {
   lyrics: LyricLine[]
   queue: NowPlaying[]
   queueOpen: boolean
+  /** «Моя волна»: бесконечный поток, который сам дополняет очередь. */
+  waveActive: boolean
   comments: TimedComment[]
   commentMode: boolean
   visualizerEnabled: boolean
@@ -70,6 +78,8 @@ type PlayerState = {
   stampLine: (index: number) => void
   jumpToLine: (seconds: number) => void
   toggleQueue: () => void
+  toggleWave: () => void
+  playCollection: (tracks: NowPlaying[], startIndex?: number) => void
   addToQueue: (track: NowPlaying) => void
   moveQueueItem: (index: number, direction: -1 | 1) => void
   removeQueueItem: (index: number) => void
@@ -82,8 +92,8 @@ type PlayerState = {
 
 const Ctx = createContext<PlayerState | null>(null)
 
-function toNowPlaying(track: Track): NowPlaying {
-  return { id: track.id, title: track.title, credits: track.credits, cover: track.cover, coverUrl: track.coverUrl, durationSec: track.durationSec, audioUrl: track.audioUrl ?? AUDIO_FALLBACK, waveform: track.waveform, releaseId: track.releaseId }
+export function toNowPlaying(track: Track): NowPlaying {
+  return { id: track.id, title: track.title, credits: track.credits, featuring: track.featuring, cover: track.cover, coverUrl: track.coverUrl, durationSec: track.durationSec, audioUrl: track.audioUrl ?? AUDIO_FALLBACK, waveform: track.waveform, releaseId: track.releaseId, isAiGenerated: track.isAiGenerated }
 }
 
 function loadLyrics(trackId: string): LyricLine[] {
@@ -110,6 +120,8 @@ function loadComments(trackId: string): TimedComment[] {
 const initialTrack = getTrack(chart[0].trackId) ?? { id: chart[0].trackId, title: chart[0].title, credits: chart[0].credits, cover: chart[0].cover, durationSec: 18, plays: 0, duration: '0:18', releaseId: chart[0].releaseId }
 
 export function PlayerProvider({ children }: { children: React.ReactNode }) {
+  const { customTracks, getRelease } = useReleases()
+  const { recordPlay, likedTrackIds, history, followingArtistIds } = useSocial()
   const audioRef = useRef<HTMLAudioElement | null>(null)
   const analyserRef = useRef<AnalyserNode | null>(null)
   const contextRef = useRef<AudioContext | null>(null)
@@ -127,6 +139,8 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   const [lyrics, setLyrics] = useState<LyricLine[]>(() => loadLyrics(initialTrack.id))
   const [queue, setQueue] = useState<NowPlaying[]>([])
   const [queueOpen, setQueueOpen] = useState(false)
+  const [waveActive, setWaveActive] = useState(false)
+  const [waveSeed, setWaveSeed] = useState(1)
   const [comments, setComments] = useState<TimedComment[]>(() => loadComments(initialTrack.id))
   const [commentMode, setCommentMode] = useState(false)
   const [visualizerEnabled, setVisualizerEnabled] = useState(false)
@@ -192,6 +206,8 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   const play = useCallback((track: NowPlaying) => {
     const audio = audioRef.current
     const isSameTrack = current.id === track.id
+    // История пополняется на каждом осознанном запуске — это вход для «Моей волны».
+    recordPlay(track.id)
     if (isSameTrack && audio) {
       if (audio.paused) { ensureAnalyser(); void audio.play().catch(() => setPlaying(false)) } else audio.pause()
       return
@@ -207,7 +223,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     audio.currentTime = 0
     ensureAnalyser()
     void audio.play().catch(() => setPlaying(false))
-  }, [current.id, ensureAnalyser])
+  }, [current.id, ensureAnalyser, recordPlay])
 
   const pause = useCallback(() => audioRef.current?.pause(), [])
   const resume = useCallback(() => { ensureAnalyser(); void audioRef.current?.play().catch(() => setPlaying(false)) }, [ensureAnalyser])
@@ -226,6 +242,68 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     const selected = eligible[Math.floor(Math.random() * Math.max(eligible.length, 1))]
     return selected ? getTrack(selected.trackId) : undefined
   }, [])
+
+  /** Полный каталог: демо-треки платформы плюс всё, что опубликовали пользователи. */
+  const pool = useMemo<Track[]>(() => {
+    const merged = new Map<string, Track>()
+    for (const track of seedTracks) merged.set(track.id, track)
+    for (const track of customTracks) merged.set(track.id, track)
+    return Array.from(merged.values())
+  }, [customTracks])
+
+  const playCollection = useCallback((items: NowPlaying[], startIndex = 0) => {
+    if (items.length === 0) return
+    const start = Math.max(0, Math.min(items.length - 1, startIndex))
+    // Запуск подборки выключает волну: слушатель явно выбрал, что играть.
+    setWaveActive(false)
+    setQueue(items.slice(start + 1))
+    play(items[start])
+  }, [play])
+
+  /** Подбирает следующую порцию волны с учётом того, что уже прозвучало. */
+  const buildWavePicks = useCallback((exclude: Iterable<string>, limit: number, seed: number) => {
+    return recommendTracks({
+      taste: { likedTrackIds, historyTrackIds: history, followingArtistIds },
+      pool,
+      getRelease,
+      exclude,
+      limit,
+      seed,
+    }).map((pick) => toNowPlaying(pick.item))
+  }, [followingArtistIds, getRelease, history, likedTrackIds, pool])
+
+  const toggleWave = useCallback(() => {
+    if (waveActive) {
+      setWaveActive(false)
+      return
+    }
+    // Новый сид на каждый запуск, иначе волна выдаст ту же последовательность.
+    const seed = waveSeed + 1
+    setWaveSeed(seed)
+    setWaveActive(true)
+
+    // Запускаем первый трек сразу: иначе нажатие «Запустить волну» ничего
+    // не меняет до конца текущей песни, и кнопка выглядит сломанной.
+    const picks = buildWavePicks([current.id], 6, seed)
+    if (picks.length === 0) return
+    const [first, ...rest] = picks
+    setQueue(rest)
+    play(first)
+  }, [buildWavePicks, current.id, play, waveActive, waveSeed])
+
+  /**
+   * Пополнение «Моей волны».
+   *
+   * Держим в очереди небольшой запас: поток должен быть бесконечным, но считать
+   * рекомендации на весь каталог заранее незачем.
+   */
+  useEffect(() => {
+    if (!waveActive || queue.length >= 3) return
+    const exclude = new Set<string>([current.id, ...queue.map((item) => item.id)])
+    const picks = buildWavePicks(exclude, 6, waveSeed + history.length)
+    if (picks.length === 0) return
+    setQueue((existing) => [...existing, ...picks])
+  }, [waveActive, queue, current.id, buildWavePicks, history.length, waveSeed])
 
   const next = useCallback(() => {
     if (queue.length) {
@@ -274,12 +352,12 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   }, [editingLyrics, seek, time, toggleMute, togglePlay])
 
   const value = useMemo<PlayerState>(() => ({
-    current, currentTrack: current, time, playing, isPlaying: playing, volume, muted, loop, shuffle, lyricsOpen, editingLyrics, lyrics, queue, queueOpen, comments, commentMode, visualizerEnabled, frequencyData,
+    current, currentTrack: current, time, playing, isPlaying: playing, volume, muted, loop, shuffle, lyricsOpen, editingLyrics, lyrics, queue, queueOpen, waveActive, comments, commentMode, visualizerEnabled, frequencyData,
     play, playTrack: play, pause, resume, togglePlay, seek, seekFraction, setVolume, toggleMute, toggleLoop, toggleShuffle, next, prev,
     setLyricsOpen, toggleLyrics: () => setLyricsOpen((open) => !open), toggleEditing: () => setEditing((value) => !value), setLyricsFromText, setTimedLyrics, stampLine, jumpToLine,
-    toggleQueue: () => setQueueOpen((open) => !open), addToQueue: (track) => setQueue((existing) => [...existing, track]), moveQueueItem: (index, direction) => setQueue((existing) => { const target = index + direction; if (target < 0 || target >= existing.length) return existing; const nextQueue = [...existing]; [nextQueue[index], nextQueue[target]] = [nextQueue[target], nextQueue[index]]; return nextQueue }), removeQueueItem: (index) => setQueue((existing) => existing.filter((_, itemIndex) => itemIndex !== index)), clearQueue: () => setQueue([]), saveQueueAsPlaylist: () => window.localStorage.setItem('gul.playlist.last.v1', JSON.stringify(queue)),
+    toggleQueue: () => setQueueOpen((open) => !open), toggleWave, playCollection, addToQueue: (track) => setQueue((existing) => [...existing, track]), moveQueueItem: (index, direction) => setQueue((existing) => { const target = index + direction; if (target < 0 || target >= existing.length) return existing; const nextQueue = [...existing]; [nextQueue[index], nextQueue[target]] = [nextQueue[target], nextQueue[index]]; return nextQueue }), removeQueueItem: (index) => setQueue((existing) => existing.filter((_, itemIndex) => itemIndex !== index)), clearQueue: () => setQueue([]), saveQueueAsPlaylist: () => window.localStorage.setItem('gul.playlist.last.v1', JSON.stringify(queue)),
     toggleCommentMode: () => setCommentMode((enabled) => !enabled), addComment, toggleVisualizer: () => { setVisualizerEnabled((enabled) => { const nextValue = !enabled; if (nextValue) ensureAnalyser(); return nextValue }) },
-  }), [addComment, commentMode, comments, current, editingLyrics, frequencyData, jumpToLine, loop, lyrics, lyricsOpen, muted, next, pause, playing, prev, queue, queueOpen, resume, seek, seekFraction, setLyricsFromText, setTimedLyrics, shuffle, stampLine, time, toggleLoop, toggleMute, togglePlay, toggleShuffle, visualizerEnabled, volume, ensureAnalyser])
+  }), [addComment, commentMode, comments, current, editingLyrics, frequencyData, jumpToLine, loop, lyrics, lyricsOpen, muted, next, pause, playCollection, playing, prev, queue, queueOpen, resume, seek, seekFraction, setLyricsFromText, setTimedLyrics, shuffle, stampLine, time, toggleLoop, toggleMute, togglePlay, toggleShuffle, toggleWave, visualizerEnabled, volume, waveActive, ensureAnalyser])
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>
 }

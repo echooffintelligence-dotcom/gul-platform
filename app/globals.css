@@ -155,6 +155,36 @@
   .skel { border-radius: 12px; background: linear-gradient(90deg, rgba(255,255,255,.04) 0 38%, rgba(78,230,255,.12) 50%, rgba(255,255,255,.04) 62%); background-size: 250% 100%; animation: sweep 1.2s linear infinite; }
   .section-h { display: flex; align-items: center; gap: 12px; margin: 48px 0 16px; } .section-h h3 { font-size: 1.05rem; font-weight: 800; text-transform: uppercase; letter-spacing: .04em; } .section-h .line { flex: 1; height: 1px; background: linear-gradient(90deg, var(--rule), transparent); }
   .wave-glow { filter: drop-shadow(0 0 7px rgba(78,230,255,.35)); }
+
+  /* ── Индикация выбора ──────────────────────────────────────────────────────
+     Единая контрастная неоновая обводка для всего выбранного: карточек,
+     обложек, элементов списков и файлов при загрузке. Раньше выделение
+     держалось на едва заметной смене фона и терялось на тёмном интерфейсе. */
+  .is-selected {
+    position: relative;
+    border-color: rgba(167, 139, 250, .85) !important;
+    box-shadow: 0 0 0 2px rgba(167, 139, 250, .85), 0 0 22px rgba(167, 139, 250, .38);
+  }
+  .is-selected-cover {
+    border-color: rgba(167, 139, 250, .9) !important;
+    box-shadow: 0 0 0 2px rgba(167, 139, 250, .9), 0 0 26px rgba(167, 139, 250, .42), inset 0 1px 0 rgba(255,255,255,.12);
+  }
+  /* Метка «выбрано» в углу обложки — цвет один, но сигнал не только цветом. */
+  .is-selected-cover::before {
+    content: '✓';
+    position: absolute;
+    top: 5px; right: 5px;
+    z-index: 2;
+    display: grid;
+    place-items: center;
+    width: 18px; height: 18px;
+    border-radius: 999px;
+    background: rgba(167, 139, 250, .95);
+    color: #10061f;
+    font-size: .62rem;
+    font-weight: 900;
+    line-height: 1;
+  }
 }
 
 @keyframes eq { from { transform: scaleY(.32); } to { transform: scaleY(1); } }

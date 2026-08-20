@@ -18,8 +18,11 @@ import {
 import { useState } from 'react'
 import { usePlayer } from '@/components/providers/player-provider'
 import { Cover } from '@/components/shared/art'
-import { Credits } from '@/components/shared/credits'
+import { TrackTitle } from '@/components/shared/track-title'
+
 import { TrackActions } from '@/components/social/track-actions'
+import { AiBadge } from '@/components/shared/ai-badge'
+import { MyWaveToggle } from './my-wave'
 import { Waveform } from './waveform'
 import { QueueDrawer } from './queue-drawer'
 import { mmss } from '@/lib/data'
@@ -41,7 +44,7 @@ export function PlayerBar() {
       {collapsed ? (
         <div className="mx-auto flex max-w-[1520px] items-center gap-3">
           <Cover cover={current.cover} coverUrl={current.coverUrl} className="h-9 w-9" />
-          <div className="min-w-0 flex-1"><div className="truncate text-sm font-bold">{current.title}</div><div className="mt-1 h-px overflow-hidden bg-white/10"><div className="h-full bg-cyan-300 shadow-[0_0_9px_rgba(78,230,255,.7)]" style={{ width: `${progress * 100}%` }} /></div></div>
+          <div className="min-w-0 flex-1"><div className="flex items-center gap-1.5"><TrackTitle title={current.title} credits={current.credits} featuring={current.featuring} className="truncate text-sm font-bold" artistClassName="text-ink-2" titleClassName="font-bold" />{current.isAiGenerated && <AiBadge compact />}</div><div className="mt-1 h-px overflow-hidden bg-white/10"><div className="h-full bg-cyan-300 shadow-[0_0_9px_rgba(78,230,255,.7)]" style={{ width: `${progress * 100}%` }} /></div></div>
           <button type="button" aria-label={playing ? 'Пауза' : 'Играть'} onClick={togglePlay} className="grid h-9 w-9 place-items-center rounded-full border border-cyan-100/60 bg-[linear-gradient(110deg,#4ee6ff,#d5fbff,#a78bfa,#4ee6ff)] bg-[length:200%_100%] text-slate-950 shadow-[0_0_20px_rgba(78,230,255,.35)] transition-all hover:bg-right active:scale-95">{playing ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}</button>
           <button type="button" aria-label={muted ? 'Включить звук' : 'Выключить звук'} onClick={toggleMute} className={transportButton}>{muted || volume === 0 ? <VolumeX className="h-4 w-4" /> : <Volume2 className="h-4 w-4" />}</button>
           <button type="button" aria-label="Развернуть плеер" onClick={() => setCollapsed(false)} className={transportButton}><ChevronUp className="h-4 w-4" /></button>
@@ -50,13 +53,13 @@ export function PlayerBar() {
         <div className="mx-auto grid max-w-[1520px] grid-cols-[minmax(0,1fr)_auto] items-center gap-3 md:grid-cols-[minmax(0,1fr)_minmax(300px,2fr)_minmax(0,1fr)] md:gap-6">
           <div className="flex min-w-0 items-center gap-3">
             <Cover cover={current.cover} coverUrl={current.coverUrl} className="h-11 w-11" />
-            <div className="min-w-0"><div className="truncate text-[0.9375rem] font-bold [font-stretch:84%]">{current.title}</div><Credits credits={current.credits} /></div>
+            <div className="min-w-0"><div className="flex items-center gap-2"><TrackTitle title={current.title} credits={current.credits} featuring={current.featuring} className="truncate text-[0.9375rem] font-bold [font-stretch:84%]" artistClassName="text-ink-2" titleClassName="font-bold" />{current.isAiGenerated && <AiBadge compact />}</div></div>
             <TrackActions trackId={current.id} title={current.title} className="ml-1 hidden sm:flex" />
           </div>
 
           <div className="order-3 col-span-2 grid gap-1.5 md:order-none md:col-span-1">
             <div className="flex items-center justify-center gap-3">
-              <button type="button" aria-label="Перемешать" aria-pressed={shuffle} className={cn(transportButton, shuffle && 'text-accent-b')} onClick={toggleShuffle}><Shuffle width={16} height={16} /></button>
+              <MyWaveToggle /><button type="button" aria-label="Перемешать" aria-pressed={shuffle} className={cn(transportButton, shuffle && 'text-accent-b')} onClick={toggleShuffle}><Shuffle width={16} height={16} /></button>
               <button type="button" aria-label="Назад" className={transportButton} onClick={prev}><SkipBack width={18} height={18} /></button>
               <button type="button" aria-label={playing ? 'Пауза' : 'Играть'} onClick={togglePlay} className="grid h-10 w-10 place-items-center rounded-full border border-cyan-100/60 bg-[linear-gradient(110deg,#4ee6ff,#d5fbff,#a78bfa,#4ee6ff)] bg-[length:200%_100%] text-slate-950 shadow-[0_0_26px_rgba(78,230,255,0.35)] transition-all duration-300 hover:bg-right hover:shadow-[0_0_34px_rgba(78,230,255,0.55)] active:scale-95">{playing ? <Pause width={17} height={17} /> : <Play width={17} height={17} />}</button>
               <button type="button" aria-label="Вперёд" className={transportButton} onClick={next}><SkipForward width={18} height={18} /></button>

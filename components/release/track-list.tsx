@@ -3,8 +3,10 @@
 import { Pause, Play, Volume1 } from 'lucide-react'
 import { usePlayer } from '@/components/providers/player-provider'
 import { useToast } from '@/components/providers/toast-provider'
-import { Credits } from '@/components/shared/credits'
+import { TrackTitle } from '@/components/shared/track-title'
+
 import { TrackActions } from '@/components/social/track-actions'
+import { AiBadge } from '@/components/shared/ai-badge'
 import type { Track } from '@/lib/data'
 import { cn } from '@/lib/utils'
 
@@ -14,7 +16,7 @@ export function TrackList({ tracks }: { tracks: Track[] }) {
   const activateTrack = (t: Track) => {
     const isCurrent = currentTrack.id === t.id
     if (isCurrent) { if (isPlaying) pause(); else resume(); return }
-    playTrack({ id: t.id, title: t.title, credits: t.credits, cover: t.cover, coverUrl: t.coverUrl, durationSec: t.durationSec, audioUrl: t.audioUrl ?? '/audio/gul-demo.wav', waveform: t.waveform, releaseId: t.releaseId })
+    playTrack({ id: t.id, title: t.title, credits: t.credits, featuring: t.featuring, cover: t.cover, coverUrl: t.coverUrl, durationSec: t.durationSec, audioUrl: t.audioUrl ?? '/audio/gul-demo.wav', waveform: t.waveform, releaseId: t.releaseId, isAiGenerated: t.isAiGenerated })
   }
   const { toast } = useToast()
 
@@ -28,7 +30,7 @@ export function TrackList({ tracks }: { tracks: Track[] }) {
             key={t.id}
             className={cn(
               'grid grid-cols-[28px_minmax(0,1fr)_78px_58px_72px] items-center gap-4 border-b border-rule-soft px-2 py-3 transition-colors hover:bg-paper-2',
-              isThisPlaying && 'bg-paper-2',
+              isCurrent && 'is-selected rounded-lg bg-paper-2',
             )}
           >
             <button
@@ -41,13 +43,9 @@ export function TrackList({ tracks }: { tracks: Track[] }) {
             </button>
             <div className="min-w-0">
               <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  className={cn('truncate text-[0.9375rem] font-semibold hover:text-red', isThisPlaying && 'text-red')}
-                  onClick={() => activateTrack(t)}
-                >
-                  {t.title}{!isCurrent && <Play className="ml-1 hidden h-3 w-3 text-ink-3 sm:inline" />}
-                </button>
+                <TrackTitle title={t.title} credits={t.credits} featuring={t.featuring} className={cn('truncate text-[0.9375rem] font-semibold', isThisPlaying && 'text-red')} artistClassName="text-ink-2" titleClassName="font-semibold" />
+                {!isCurrent && <button type="button" onClick={() => activateTrack(t)} aria-label={`Слушать ${t.title}`} className="grid h-6 w-6 shrink-0 place-items-center rounded hover:bg-paper-3"><Play className="h-3 w-3 text-ink-3" /></button>}
+                {t.isAiGenerated && <AiBadge compact />}
                 {t.hasLyrics && (
                   <button
                     type="button"
@@ -61,7 +59,6 @@ export function TrackList({ tracks }: { tracks: Track[] }) {
                   </button>
                 )}
               </div>
-              <Credits credits={t.credits} />
             </div>
             <div className="text-right font-mono text-[0.75rem] text-ink-2">{t.plays.toLocaleString('ru-RU')}</div>
             <div className="text-right font-mono text-[0.75rem] text-ink-3">{t.duration}</div>

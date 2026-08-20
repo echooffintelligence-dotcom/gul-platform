@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { asText, isRecord } from '@/lib/server-api-store'
+import { asText, isRecord } from '@/lib/server-store'
 import { createServerAuthClient } from '@/lib/server-supabase-auth'
 
 export async function POST(request: NextRequest) {

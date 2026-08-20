@@ -19,52 +19,71 @@ npm run build
 npm run start
 ```
 
+> `next.config.mjs` больше **не** содержит `typescript.ignoreBuildErrors`. Production-сборка падает на ошибках типов — «зелёный» билд снова что-то значит.
+
+## Перед первым запуском
+
+1. Выполните `supabase/schema.sql` в Supabase → SQL Editor. Скрипт создаёт таблицы, включает RLS и заводит Storage-бакеты `audio` и `covers`.
+2. Задайте переменные окружения (см. `.env.example`).
+3. Отключите **Confirm email** в Supabase → Authentication, если нужен моментальный вход после регистрации.
+
+Полный список ручных действий — в `MANUAL_STEPS.txt`.
+
+## Модель доступа
+
+Сервер доверяет **только** access-токену Supabase из заголовка `Authorization: Bearer <token>`.
+
+- `owner_id` вычисляется из токена и никогда не читается из тела запроса.
+- Все мутирующие ручки без валидного токена отвечают `401`.
+- Владение строками дополнительно проверяет RLS в базе, поэтому забытая проверка в новом handler-е не открывает доступ к чужим данным.
+- Оценка ГЗТ ограничена парой `(release_id, voter_id)`: один пользователь — один голос, повторная отправка заменяет прежнюю оценку.
+
+**Локальный fallback.** Если Supabase Auth недоступен, интерфейс создаёт временную сессию в `gul.auth.local.v1`, чтобы приложением можно было пользоваться. У такой сессии нет настоящего JWT, поэтому она работает только локально и ничего не пишет на сервер. Это осознанный размен: иначе поддельная сессия писала бы в общие данные.
+
 ## Интерфейс и медиа
 
-Интерфейс построен на тёмных aurora-фонах, glass-панелях, неоновых состояниях, hover glow и микроанимациях. Глобальный плеер использует настоящий `HTMLAudioElement`, drag/keyboard seek, loop, shuffle, volume, mute и Web Audio API waveform для загруженных файлов.
+Интерфейс построен на тёмных aurora-фонах, glass-панелях, неоновых состояниях, hover glow и микроанимациях. Выбранные элементы, карточки и обложки получают контрастную неоновую обводку (`.is-selected`, `.is-selected-cover`). Глобальный плеер использует настоящий `HTMLAudioElement`, drag/keyboard seek, loop, shuffle, volume, mute и Web Audio API waveform для загруженных файлов.
 
-Кабинет публикует MP3/WAV/FLAC и JPG/PNG/WEBP. Файлы отправляются в публичные Supabase Storage-пути `audio/tracks/` и `covers/releases/`; при сетевой ошибке хранение моментально переключается на `blob:` URL, не прерывая текущую сессию.
+Кабинет публикует MP3/WAV/FLAC и JPG/PNG/WEBP. Файлы уходят в Supabase Storage по пути `<uid>/tracks/…` и `<uid>/releases/…` — политика бакета сверяет первый сегмент пути с `auth.uid()`, поэтому писать в чужую папку нельзя. При недоступности Storage используется `blob:`-копия, и интерфейс **явно предупреждает**, что файл живёт только в текущей вкладке.
 
-## Auth
+## Возможности
 
-`components/providers/auth-provider.tsx` использует официальный Supabase Auth client и `onAuthStateChange`. Поддерживаются email/password `signUp`, `signIn` и `signOut`; форма расположена в `components/auth/auth-modal.tsx`.
-
-> Чтобы обеспечить требуемый моментальный вход после регистрации, отключите **Confirm email** в настройках Supabase Auth. Если Auth-сервис недоступен, интерфейс автоматически сохраняет временную local session в `gul.auth.local.v1` и не блокирует работу.
+| Раздел | Что делает |
+|---|---|
+| Моя волна | Бесконечный персональный поток. Ранжирует каталог по тегам, жанрам, общим продюсерам, лайкам, истории и подпискам; очередь пополняется автоматически. |
+| Слушателям также нравится | Похожие артисты на странице артиста: пересечение жанров, тегов, общих участников и города. Каждая рекомендация подписана причиной. |
+| Плейлисты | Публичные, по ссылке и приватные. Приватные видны только автору — это закреплено политикой RLS, а не только интерфейсом. |
+| Понравившиеся треки | Системный автоплейлист: собирает всё, что отмечено ❤️. |
+| Ссылки артиста | Модульный блок: адрес (сайт или email), короткая подпись, удаление. Кнопки «+ Add link» и «+ Add support link». Отображаются кликабельными бейджами. |
+| Маркировка ИИ | Чекбокс при публикации и полупрозрачный бейдж 🤖 AI в карточке трека, чарте и плеере. |
+| ГЗТ | Пятиосевая оценка 0–90 с radar-чартом и сертификацией. |
 
 ## API facade и self-hosting
 
-`lib/api-client.ts` — единый типизированный фасад. Если задан `NEXT_PUBLIC_API_URL`, запросы отправляются на внешний backend; иначе используются встроенные Next.js route handlers.
+`lib/api-client.ts` — единый типизированный фасад. Если задан `NEXT_PUBLIC_API_URL`, запросы отправляются на внешний backend; иначе используются встроенные Next.js route handlers. Токен подставляется автоматически: `AuthProvider` держит его в актуальном состоянии.
 
-| Область | Встроенный endpoint |
-|---|---|
-| Auth | `/api/auth/login`, `/api/auth/register`, `/api/auth/me`, `/api/auth/logout` |
-| Tracks | `/api/tracks` |
-| Releases | `/api/releases` |
-| ГЗТ | `/api/gzt` |
-| Workspace | `/api/workspace/sync` |
+| Область | Встроенный endpoint | Авторизация |
+|---|---|---|
+| Auth | `/api/auth/login`, `/api/auth/register`, `/api/auth/me`, `/api/auth/logout` | — |
+| Tracks | `/api/tracks` | GET публичный, POST/DELETE требуют токен |
+| Releases | `/api/releases` | GET публичный, POST требует токен |
+| ГЗТ | `/api/gzt` | требует токен |
+| Workspace | `/api/workspace/sync` | требует токен на всех методах |
 
-Route handlers валидируют входные данные и возвращают offline-safe fallback-ответы. `owner_id` передаётся для всех новых карточек, треков и релизов; текущий in-memory adapter в `lib/server-api-store.ts` изолирован, поэтому его можно заменить на Node.js/Go/Python или Supabase database без переписывания UI.
+`lib/server-store.ts` ходит в PostgREST от имени пользователя. Если Supabase недоступен, используется процессная память — такие ответы помечены `fallback: true`. Память не переживает перезапуск и не разделяется между инстансами, поэтому это именно резерв, а не хранилище.
 
 ## Локальные данные
 
 | Домен | Ключ localStorage |
 |---|---|
 | Fallback Auth session | `gul.auth.local.v1` |
-| Workspace, активная карточка и snapshot | `gul.workspace.v3` |
+| Workspace, активная карточка и snapshot | `gul.workspace.v4.<userId>` |
 | Релизы, пользовательские треки и чарт | `gul.releases.v2` |
 | Синхронизация текста | `gul.lyrics.<trackId>.v1` |
-| Подписки, лайки, плейлисты и Blend | `gul.social.v2` |
+| Подписки, лайки, плейлисты, ссылки, история и Blend | `gul.social.v3` |
 
-## Supabase Workspace Sync
+Ключ workspace привязан к пользователю: на общем компьютере рабочее пространство одного аккаунта больше не подхватывается другим. Данные из `gul.social.v2` и `gul.workspace.v3` мигрируют автоматически при первом запуске.
 
-`lib/supabase.ts` использует публичные проектные fallback-параметры, а `NEXT_PUBLIC_SUPABASE_URL` и `NEXT_PUBLIC_SUPABASE_ANON_KEY` имеют приоритет. Snapshot сохраняется в `localStorage` немедленно и синхронизируется с debounce **500 ms**.
+## Схема Supabase
 
-```sql
-create table workspace_snapshots (
-  id text primary key,
-  payload jsonb not null,
-  updated_at timestamptz default now()
-);
-```
-
-Перед production-развёртыванием обязательно настройте RLS для `workspace_snapshots`, Storage buckets и реального пользовательского `snapshotId`.
+Полная схема с RLS и Storage — в `supabase/schema.sql`. Файл написан как миграция: недостающие колонки добавляются через `alter table ... add column if not exists`, поэтому он одинаково работает и на чистом проекте, и поверх уже существующих таблиц.
