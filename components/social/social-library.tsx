@@ -64,9 +64,9 @@ export function SocialLibrary() {
 
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
         {/* Системный автоплейлист «Понравившиеся треки» */}
-        <div className="rounded-2xl border border-rose-300/15 bg-rose-300/[.025] p-4">
+        <div className="rounded-2xl border border-accent-hot/15 bg-accent-hot/[.025] p-4">
           <div className="flex items-center gap-2">
-            <Heart className="h-4 w-4 text-rose-300" fill="currentColor" />
+            <Heart className="h-4 w-4 text-accent-hot" fill="currentColor" />
             <div>
               <div className="eyebrow">системный плейлист</div>
               <h3 className="font-semibold">{likedPlaylist.title}</h3>
@@ -81,7 +81,7 @@ export function SocialLibrary() {
           {likedTracks.length === 0 ? (
             <p className="mt-4 text-sm text-ink-3">Нажмите сердце у трека в чарте, релизе или плеере — он появится здесь автоматически.</p>
           ) : (
-            <ul className="mt-4 grid divide-y divide-white/8">
+            <ul className="mt-4 grid divide-y divide-rule">
               {likedTracks.slice(0, 5).map((track) => (
                 <li key={track.id} className="flex items-center gap-3 py-2">
                   <Cover cover={track.cover} coverUrl={track.coverUrl} className={cn('h-9 w-9', currentTrack.id === track.id && 'is-selected-cover')} />
@@ -92,7 +92,7 @@ export function SocialLibrary() {
                     </div>
                     <div className="font-mono text-[.65rem] text-ink-3">{track.duration}</div>
                   </div>
-                  {track.releaseId && <Link href={`/release/${track.releaseId}`} className="font-mono text-[.65rem] text-cyan-100 hover:underline">релиз</Link>}
+                  {track.releaseId && <Link href={`/release/${track.releaseId}`} className="font-mono text-[.65rem] text-accent-1 hover:underline">релиз</Link>}
                 </li>
               ))}
               {likedTracks.length > 5 && <li className="py-2 font-mono text-[.65rem] text-ink-3">и ещё {likedTracks.length - 5}</li>}
@@ -101,9 +101,9 @@ export function SocialLibrary() {
         </div>
 
         {/* Подписки */}
-        <div className="rounded-2xl border border-cyan-300/15 bg-cyan-300/[.025] p-4">
+        <div className="rounded-2xl border border-accent-1/15 bg-accent-1/[.025] p-4">
           <div className="flex items-center gap-2">
-            <Users className="h-4 w-4 text-cyan-100" />
+            <Users className="h-4 w-4 text-accent-1" />
             <div>
               <div className="eyebrow">мои подписки</div>
               <h3 className="font-semibold">Артисты и новинки</h3>
@@ -120,10 +120,10 @@ export function SocialLibrary() {
                   .filter((release): release is NonNullable<typeof release> => Boolean(release))
                   .sort((left, right) => right.year - left.year)[0]
                 return (
-                  <li key={artist.id} className="flex items-center gap-3 rounded-xl bg-black/15 p-2">
+                  <li key={artist.id} className="flex items-center gap-3 rounded-xl bg-paper-2 p-2">
                     <Cover cover={newest?.cover ?? 'c1'} coverUrl={newest?.coverUrl} className="h-9 w-9" />
                     <div className="min-w-0 flex-1">
-                      <Link href={`/artist/${artist.id}`} className="block truncate text-sm hover:text-cyan-100">{artist.name}</Link>
+                      <Link href={`/artist/${artist.id}`} className="block truncate text-sm hover:text-accent-1">{artist.name}</Link>
                       <span className="font-mono text-[.62rem] text-ink-3">{newest ? `новинка: ${newest.title}` : 'новинки появятся здесь'}</span>
                     </div>
                   </li>
@@ -136,18 +136,18 @@ export function SocialLibrary() {
 
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)]">
         {/* Создание плейлиста */}
-        <form onSubmit={submit} className="rounded-2xl border border-white/10 bg-black/15 p-4">
+        <form onSubmit={submit} className="rounded-2xl border border-rule bg-paper-2 p-4">
           <div className="flex items-center gap-2">
-            <Plus className="h-4 w-4 text-cyan-100" />
+            <Plus className="h-4 w-4 text-accent-1" />
             <div>
               <div className="eyebrow">новый плейлист</div>
               <h3 className="font-semibold">Собрать свою подборку</h3>
             </div>
           </div>
           <div className="mt-4 grid gap-2">
-            <input required value={title} onChange={(event) => setTitle(event.target.value)} placeholder="Название плейлиста" className="rounded-lg border border-white/10 bg-black/20 px-3 py-2 text-sm outline-none focus:border-cyan-300/45" />
-            <textarea value={description} onChange={(event) => setDescription(event.target.value)} rows={2} placeholder="Описание" className="resize-none rounded-lg border border-white/10 bg-black/20 px-3 py-2 text-sm outline-none focus:border-cyan-300/45" />
-            <input value={coverUrl} onChange={(event) => setCoverUrl(event.target.value)} placeholder="URL обложки — необязательно" className="rounded-lg border border-white/10 bg-black/20 px-3 py-2 text-sm outline-none focus:border-cyan-300/45" />
+            <input required value={title} onChange={(event) => setTitle(event.target.value)} placeholder="Название плейлиста" className="rounded-lg border border-rule bg-paper-2 px-3 py-2 text-sm outline-none focus:border-accent-1/45" />
+            <textarea value={description} onChange={(event) => setDescription(event.target.value)} rows={2} placeholder="Описание" className="resize-none rounded-lg border border-rule bg-paper-2 px-3 py-2 text-sm outline-none focus:border-accent-1/45" />
+            <input value={coverUrl} onChange={(event) => setCoverUrl(event.target.value)} placeholder="URL обложки — необязательно" className="rounded-lg border border-rule bg-paper-2 px-3 py-2 text-sm outline-none focus:border-accent-1/45" />
 
             {/* Приватность выбирается кнопками: так видно все варианты сразу и текущий выделен. */}
             <div className="grid gap-1">
@@ -164,7 +164,7 @@ export function SocialLibrary() {
                       aria-pressed={selected}
                       className={cn(
                         'inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 font-mono text-xs transition-colors',
-                        selected ? 'is-selected border-violet-300/60 bg-violet-300/10 text-violet-50' : 'border-white/10 text-ink-2 hover:border-white/25 hover:text-ink',
+                        selected ? 'is-selected border-accent-2/60 bg-accent-2/10 text-accent-2' : 'border-rule text-ink-2 hover:border-rule hover:text-ink',
                       )}
                     >
                       <Icon className="h-3.5 w-3.5" />{label}
@@ -180,9 +180,9 @@ export function SocialLibrary() {
         </form>
 
         {/* Список плейлистов */}
-        <div className="rounded-2xl border border-white/10 p-4">
+        <div className="rounded-2xl border border-rule p-4">
           <div className="flex items-center gap-2">
-            <Music2 className="h-4 w-4 text-cyan-100" />
+            <Music2 className="h-4 w-4 text-accent-1" />
             <div>
               <div className="eyebrow">мои плейлисты</div>
               <h3 className="font-semibold">{playlists.length || 'Нет пользовательских плейлистов'}</h3>
@@ -198,7 +198,7 @@ export function SocialLibrary() {
                 const expanded = openId === playlist.id
                 const items = resolve(playlist.trackIds)
                 return (
-                  <li key={playlist.id} className={cn('rounded-xl bg-white/[.035] p-2.5', expanded && 'is-selected')}>
+                  <li key={playlist.id} className={cn('rounded-xl bg-paper-2 p-2.5', expanded && 'is-selected')}>
                     <div className="flex items-center gap-3">
                       <button type="button" onClick={() => playPlaylist(playlist)} aria-label={`Слушать ${playlist.title}`} className="shrink-0">
                         <Cover cover="c1" coverUrl={playlist.coverUrl} className="h-10 w-10" />
@@ -210,21 +210,21 @@ export function SocialLibrary() {
                           <span className="inline-flex items-center gap-1" title={hint}><Icon className="h-3 w-3" />{label}</span>
                         </div>
                       </button>
-                      <button type="button" onClick={() => playPlaylist(playlist)} aria-label={`Воспроизвести ${playlist.title}`} className="grid h-8 w-8 place-items-center rounded-lg text-ink-3 transition-colors hover:bg-cyan-300/10 hover:text-cyan-100">
+                      <button type="button" onClick={() => playPlaylist(playlist)} aria-label={`Воспроизвести ${playlist.title}`} className="grid h-8 w-8 place-items-center rounded-lg text-ink-3 transition-colors hover:bg-accent-1/10 hover:text-accent-1">
                         <Play className="h-3.5 w-3.5" />
                       </button>
                       <button
                         type="button"
                         onClick={() => { deletePlaylist(playlist.id); toast(`Плейлист «${playlist.title}» удалён`) }}
                         aria-label={`Удалить плейлист ${playlist.title}`}
-                        className="grid h-8 w-8 place-items-center rounded-lg text-ink-3 transition-colors hover:bg-rose-300/10 hover:text-rose-200"
+                        className="grid h-8 w-8 place-items-center rounded-lg text-ink-3 transition-colors hover:bg-accent-hot/10 hover:text-accent-hot"
                       >
                         <Trash2 className="h-3.5 w-3.5" />
                       </button>
                     </div>
 
                     {expanded && (
-                      <div className="mt-3 border-t border-white/10 pt-3">
+                      <div className="mt-3 border-t border-rule pt-3">
                         <div className="mb-2 flex flex-wrap items-center gap-2">
                           <span className="font-mono text-[.6rem] uppercase tracking-[.1em] text-ink-3">доступ</span>
                           {PRIVACY_ORDER.map((value) => {
@@ -238,7 +238,7 @@ export function SocialLibrary() {
                                 aria-pressed={selected}
                                 className={cn(
                                   'inline-flex items-center gap-1 rounded-lg border px-2 py-1 font-mono text-[.65rem] transition-colors',
-                                  selected ? 'is-selected border-violet-300/60 bg-violet-300/10 text-violet-50' : 'border-white/10 text-ink-3 hover:text-ink',
+                                  selected ? 'is-selected border-accent-2/60 bg-accent-2/10 text-accent-2' : 'border-rule text-ink-3 hover:text-ink',
                                 )}
                               >
                                 <meta.Icon className="h-3 w-3" />{meta.label}
@@ -250,7 +250,7 @@ export function SocialLibrary() {
                         {items.length === 0 ? (
                           <p className="text-xs text-ink-3">Пусто. Добавьте треки кнопкой ⊕ в чарте или на странице релиза.</p>
                         ) : (
-                          <ul className="grid divide-y divide-white/8">
+                          <ul className="grid divide-y divide-rule">
                             {items.map((track) => (
                               <li key={track.id} className="flex items-center gap-2 py-1.5">
                                 <Cover cover={track.cover} coverUrl={track.coverUrl} className={cn('h-7 w-7', currentTrack.id === track.id && 'is-selected-cover')} />

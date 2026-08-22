@@ -24,7 +24,12 @@ export type NowPlaying = {
   releaseId?: string
   /** Показывает бейдж 🤖 AI в плеере. */
   isAiGenerated?: boolean
+  /** Видеоклип: включает кнопку «Клип» в плеере. */
+  videoUrl?: string
 }
+
+/** Режимы повтора: выключен / по кругу весь список / один трек. */
+export type RepeatMode = 'off' | 'all' | 'one'
 
 export type TimedComment = {
   id: string
@@ -45,6 +50,7 @@ type PlayerState = {
   volume: number
   muted: boolean
   loop: boolean
+  repeat: RepeatMode
   shuffle: boolean
   lyricsOpen: boolean
   editingLyrics: boolean
@@ -53,6 +59,8 @@ type PlayerState = {
   queueOpen: boolean
   /** «Моя волна»: бесконечный поток, который сам дополняет очередь. */
   waveActive: boolean
+  /** Открыт полноэкранный просмотр клипа. */
+  clipOpen: boolean
   comments: TimedComment[]
   commentMode: boolean
   visualizerEnabled: boolean
@@ -67,6 +75,7 @@ type PlayerState = {
   setVolume: (value: number) => void
   toggleMute: () => void
   toggleLoop: () => void
+  cycleRepeat: () => void
   toggleShuffle: () => void
   next: () => void
   prev: () => void
@@ -79,6 +88,7 @@ type PlayerState = {
   jumpToLine: (seconds: number) => void
   toggleQueue: () => void
   toggleWave: () => void
+  setClipOpen: (value: boolean) => void
   playCollection: (tracks: NowPlaying[], startIndex?: number) => void
   addToQueue: (track: NowPlaying) => void
   moveQueueItem: (index: number, direction: -1 | 1) => void
@@ -93,7 +103,7 @@ type PlayerState = {
 const Ctx = createContext<PlayerState | null>(null)
 
 export function toNowPlaying(track: Track): NowPlaying {
-  return { id: track.id, title: track.title, credits: track.credits, featuring: track.featuring, cover: track.cover, coverUrl: track.coverUrl, durationSec: track.durationSec, audioUrl: track.audioUrl ?? AUDIO_FALLBACK, waveform: track.waveform, releaseId: track.releaseId, isAiGenerated: track.isAiGenerated }
+  return { id: track.id, title: track.title, credits: track.credits, featuring: track.featuring, cover: track.cover, coverUrl: track.coverUrl, durationSec: track.durationSec, audioUrl: track.audioUrl ?? AUDIO_FALLBACK, waveform: track.waveform, releaseId: track.releaseId, isAiGenerated: track.isAiGenerated, videoUrl: track.videoUrl }
 }
 
 function loadLyrics(trackId: string): LyricLine[] {
@@ -121,7 +131,7 @@ const initialTrack = getTrack(chart[0].trackId) ?? { id: chart[0].trackId, title
 
 export function PlayerProvider({ children }: { children: React.ReactNode }) {
   const { customTracks, getRelease } = useReleases()
-  const { recordPlay, likedTrackIds, history, followingArtistIds } = useSocial()
+  const { recordPlay, addListenSeconds, likedTrackIds, history, followingArtistIds } = useSocial()
   const audioRef = useRef<HTMLAudioElement | null>(null)
   const analyserRef = useRef<AnalyserNode | null>(null)
   const contextRef = useRef<AudioContext | null>(null)
@@ -132,14 +142,17 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   const [playing, setPlaying] = useState(false)
   const [volume, setVolumeState] = useState(0.8)
   const [muted, setMuted] = useState(false)
-  const [loop, setLoop] = useState(false)
+  const [repeat, setRepeat] = useState<RepeatMode>('off')
+  const loop = repeat === 'one'
   const [shuffle, setShuffle] = useState(false)
-  const [lyricsOpen, setLyricsOpen] = useState(true)
+  // false: текст теперь полноэкранный, открытый по умолчанию перекрыл бы весь сайт.
+  const [lyricsOpen, setLyricsOpen] = useState(false)
   const [editingLyrics, setEditing] = useState(false)
   const [lyrics, setLyrics] = useState<LyricLine[]>(() => loadLyrics(initialTrack.id))
   const [queue, setQueue] = useState<NowPlaying[]>([])
   const [queueOpen, setQueueOpen] = useState(false)
   const [waveActive, setWaveActive] = useState(false)
+  const [clipOpen, setClipOpen] = useState(false)
   const [waveSeed, setWaveSeed] = useState(1)
   const [comments, setComments] = useState<TimedComment[]>(() => loadComments(initialTrack.id))
   const [commentMode, setCommentMode] = useState(false)
@@ -225,6 +238,18 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     void audio.play().catch(() => setPlaying(false))
   }, [current.id, ensureAnalyser, recordPlay])
 
+  /**
+   * Учёт наслушанного времени для «Топа артистов месяца».
+   * Считаем интервалом, а не по timeupdate: перемотка не должна
+   * засчитываться как прослушивание.
+   */
+  useEffect(() => {
+    if (!playing) return
+    const trackId = current.id
+    const timer = window.setInterval(() => addListenSeconds(trackId, 5), 5_000)
+    return () => window.clearInterval(timer)
+  }, [playing, current.id, addListenSeconds])
+
   const pause = useCallback(() => audioRef.current?.pause(), [])
   const resume = useCallback(() => { ensureAnalyser(); void audioRef.current?.play().catch(() => setPlaying(false)) }, [ensureAnalyser])
   const togglePlay = useCallback(() => { if (audioRef.current?.paused) resume(); else pause() }, [pause, resume])
@@ -232,7 +257,9 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   const seekFraction = useCallback((fraction: number) => seek(Math.max(0, Math.min(1, fraction)) * current.durationSec), [current.durationSec, seek])
   const setVolume = useCallback((value: number) => { const safe = Math.max(0, Math.min(1, value)); setVolumeState(safe); setMuted(false); if (audioRef.current) { audioRef.current.volume = safe; audioRef.current.muted = false } }, [])
   const toggleMute = useCallback(() => { const nextMuted = !audioRef.current?.muted; setMuted(nextMuted); if (audioRef.current) audioRef.current.muted = nextMuted }, [])
-  const toggleLoop = useCallback(() => setLoop((value) => !value), [])
+  // Кнопка перебирает режимы по кругу: выкл → весь список → один трек.
+  const cycleRepeat = useCallback(() => setRepeat((mode) => (mode === 'off' ? 'all' : mode === 'all' ? 'one' : 'off')), [])
+  const toggleLoop = useCallback(() => cycleRepeat(), [cycleRepeat])
   const toggleShuffle = useCallback(() => setShuffle((value) => !value), [])
 
   useEffect(() => { if (audioRef.current) audioRef.current.loop = loop }, [loop])
@@ -320,7 +347,19 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   }, [current.id, play, queue, shuffle, stationTrack])
 
   const prev = useCallback(() => { const index = chart.findIndex((entry) => entry.trackId === current.id); const entry = chart[(index - 1 + chart.length) % chart.length]; const track = entry ? getTrack(entry.trackId) : undefined; if (track) play(toNowPlaying(track)) }, [current.id, play])
-  useEffect(() => { const audio = audioRef.current; if (!audio) return; audio.onended = loop ? null : next; return () => { audio.onended = null } }, [next, loop])
+  useEffect(() => {
+    const audio = audioRef.current
+    if (!audio) return
+    // repeat === 'one' закрывает audio.loop, поэтому onended там не нужен.
+    if (loop) { audio.onended = null; return () => { audio.onended = null } }
+    audio.onended = () => {
+      const isLastInChart = chart.findIndex((entry) => entry.trackId === current.id) === chart.length - 1
+      // При выключенном повторе список должен заканчиваться, а не идти по кругу.
+      if (repeat === 'off' && queue.length === 0 && !waveActive && isLastInChart) { setPlaying(false); return }
+      next()
+    }
+    return () => { audio.onended = null }
+  }, [next, loop, repeat, queue.length, waveActive, current.id])
 
   const persistLyrics = useCallback((nextLyrics: LyricLine[]) => { setLyrics(nextLyrics); window.localStorage.setItem(lyricsStorageKey(current.id), JSON.stringify(nextLyrics)) }, [current.id])
   const setLyricsFromText = useCallback((text: string) => { persistLyrics(text.split(/\r?\n/).map((line, index) => ({ t: index === 0 ? 0 : index * 4, text: line.trim() })).filter((line) => line.text.length > 0)) }, [persistLyrics])
@@ -352,12 +391,12 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   }, [editingLyrics, seek, time, toggleMute, togglePlay])
 
   const value = useMemo<PlayerState>(() => ({
-    current, currentTrack: current, time, playing, isPlaying: playing, volume, muted, loop, shuffle, lyricsOpen, editingLyrics, lyrics, queue, queueOpen, waveActive, comments, commentMode, visualizerEnabled, frequencyData,
-    play, playTrack: play, pause, resume, togglePlay, seek, seekFraction, setVolume, toggleMute, toggleLoop, toggleShuffle, next, prev,
+    current, currentTrack: current, time, playing, isPlaying: playing, volume, muted, loop, shuffle, lyricsOpen, editingLyrics, lyrics, queue, queueOpen, waveActive, clipOpen, repeat, comments, commentMode, visualizerEnabled, frequencyData,
+    play, playTrack: play, pause, resume, togglePlay, seek, seekFraction, setVolume, toggleMute, toggleLoop, cycleRepeat, toggleShuffle, next, prev,
     setLyricsOpen, toggleLyrics: () => setLyricsOpen((open) => !open), toggleEditing: () => setEditing((value) => !value), setLyricsFromText, setTimedLyrics, stampLine, jumpToLine,
-    toggleQueue: () => setQueueOpen((open) => !open), toggleWave, playCollection, addToQueue: (track) => setQueue((existing) => [...existing, track]), moveQueueItem: (index, direction) => setQueue((existing) => { const target = index + direction; if (target < 0 || target >= existing.length) return existing; const nextQueue = [...existing]; [nextQueue[index], nextQueue[target]] = [nextQueue[target], nextQueue[index]]; return nextQueue }), removeQueueItem: (index) => setQueue((existing) => existing.filter((_, itemIndex) => itemIndex !== index)), clearQueue: () => setQueue([]), saveQueueAsPlaylist: () => window.localStorage.setItem('gul.playlist.last.v1', JSON.stringify(queue)),
+    toggleQueue: () => setQueueOpen((open) => !open), toggleWave, setClipOpen, playCollection, addToQueue: (track) => setQueue((existing) => [...existing, track]), moveQueueItem: (index, direction) => setQueue((existing) => { const target = index + direction; if (target < 0 || target >= existing.length) return existing; const nextQueue = [...existing]; [nextQueue[index], nextQueue[target]] = [nextQueue[target], nextQueue[index]]; return nextQueue }), removeQueueItem: (index) => setQueue((existing) => existing.filter((_, itemIndex) => itemIndex !== index)), clearQueue: () => setQueue([]), saveQueueAsPlaylist: () => window.localStorage.setItem('gul.playlist.last.v1', JSON.stringify(queue)),
     toggleCommentMode: () => setCommentMode((enabled) => !enabled), addComment, toggleVisualizer: () => { setVisualizerEnabled((enabled) => { const nextValue = !enabled; if (nextValue) ensureAnalyser(); return nextValue }) },
-  }), [addComment, commentMode, comments, current, editingLyrics, frequencyData, jumpToLine, loop, lyrics, lyricsOpen, muted, next, pause, playCollection, playing, prev, queue, queueOpen, resume, seek, seekFraction, setLyricsFromText, setTimedLyrics, shuffle, stampLine, time, toggleLoop, toggleMute, togglePlay, toggleShuffle, toggleWave, visualizerEnabled, volume, waveActive, ensureAnalyser])
+  }), [addComment, commentMode, comments, current, editingLyrics, frequencyData, jumpToLine, loop, lyrics, lyricsOpen, muted, next, pause, playCollection, playing, prev, queue, queueOpen, resume, seek, seekFraction, setLyricsFromText, setTimedLyrics, repeat, shuffle, stampLine, time, cycleRepeat, toggleLoop, toggleMute, togglePlay, toggleShuffle, toggleWave, visualizerEnabled, volume, waveActive, clipOpen, ensureAnalyser])
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>
 }

@@ -3,6 +3,9 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react'
 import type { ArtistLink } from '@/lib/data'
 
+/** Пользовательские правки профиля артиста. */
+export type ArtistProfile = { bio?: string; avatarUrl?: string; bannerUrl?: string }
+
 export type Repost = { id: string; releaseId: string; title: string; username: string; createdAt: string }
 export type LegacyExternalLinks = { vk: string; telegram: string; bandcamp: string; boosty: string; spotify: string }
 export type CreatorSettings = {
@@ -26,8 +29,15 @@ type State = {
   blends: Blend[]
   /** Ссылки профиля по id карточки артиста. */
   artistLinks: Record<string, ArtistLink[]>
+  /** Правки профиля артиста поверх каталога: описание, аватар, шапка. */
+  artistProfiles: Record<string, ArtistProfile>
   /** История прослушиваний, свежие первыми. Питает «Мою волну». */
   history: string[]
+  /**
+   * Секунды прослушивания по месяцам: { '2026-08': { trackId: 320 } }.
+   * Питает раздел «Топ артистов месяца» и счётчик наслушанного времени.
+   */
+  listenStats: Record<string, Record<string, number>>
 }
 
 type SocialContext = {
@@ -38,8 +48,13 @@ type SocialContext = {
   followingArtistIds: string[]
   likedTrackIds: string[]
   history: string[]
+  listenStats: Record<string, Record<string, number>>
+  /** Прибавляет прослушанные секунды к текущему месяцу. */
+  addListenSeconds: (trackId: string, seconds: number) => void
   spotlightFor: (artistId: string) => string[]
   linksFor: (artistId: string) => ArtistLink[]
+  profileFor: (artistId: string) => ArtistProfile
+  setArtistProfile: (artistId: string, patch: ArtistProfile) => void
   isReposted: (releaseId: string) => boolean
   isFollowing: (artistId: string) => boolean
   isLiked: (trackId: string) => boolean
@@ -64,6 +79,11 @@ const KEY = 'gul.social.v3'
 const LEGACY_KEYS = ['gul.social.v2', 'gul.social.creator.v1']
 const HISTORY_LIMIT = 200
 
+/** Текущий месяц в виде '2026-08' — ключ для помесячной статистики. */
+export function monthKey(date = new Date()) {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`
+}
+
 const likedPlaylist = (trackIds: string[]): SocialPlaylist => ({
   id: 'liked',
   title: 'Понравившиеся треки',
@@ -74,7 +94,7 @@ const likedPlaylist = (trackIds: string[]): SocialPlaylist => ({
   system: true,
 })
 
-const emptyState = (): State => ({ reposts: [], spotlight: {}, settings: {}, followingArtistIds: [], likedTrackIds: [], playlists: [], blends: [], artistLinks: {}, history: [] })
+const emptyState = (): State => ({ reposts: [], spotlight: {}, settings: {}, followingArtistIds: [], likedTrackIds: [], playlists: [], blends: [], artistLinks: {}, artistProfiles: {}, history: [], listenStats: {} })
 const defaultSettings = (): CreatorSettings => ({ allowDownload: false, secretToken: crypto.randomUUID().replaceAll('-', '') })
 const Ctx = createContext<SocialContext | null>(null)
 
@@ -137,7 +157,9 @@ function normalizeState(value: unknown): State {
       : [],
     blends: Array.isArray(raw.blends) ? (raw.blends as Blend[]) : [],
     artistLinks,
+    artistProfiles: raw.artistProfiles && typeof raw.artistProfiles === 'object' ? (raw.artistProfiles as Record<string, ArtistProfile>) : {},
     history: stringList(raw.history).slice(0, HISTORY_LIMIT),
+    listenStats: raw.listenStats && typeof raw.listenStats === 'object' ? (raw.listenStats as Record<string, Record<string, number>>) : {},
   }
 }
 
@@ -181,6 +203,18 @@ export function SocialProvider({ children }: { children: React.ReactNode }) {
     })
   }, [])
 
+  const addListenSeconds = useCallback((trackId: string, seconds: number) => {
+    if (!trackId || seconds <= 0) return
+    const month = monthKey()
+    setState((previous) => {
+      const forMonth = previous.listenStats[month] ?? {}
+      return {
+        ...previous,
+        listenStats: { ...previous.listenStats, [month]: { ...forMonth, [trackId]: (forMonth[trackId] ?? 0) + seconds } },
+      }
+    })
+  }, [])
+
   const value = useMemo<SocialContext>(() => ({
     reposts: state.reposts,
     playlists: state.playlists,
@@ -189,8 +223,15 @@ export function SocialProvider({ children }: { children: React.ReactNode }) {
     followingArtistIds: state.followingArtistIds,
     likedTrackIds: state.likedTrackIds,
     history: state.history,
+    listenStats: state.listenStats,
+    addListenSeconds,
     spotlightFor: (artistId) => state.spotlight[artistId] ?? [],
     linksFor: (artistId) => state.artistLinks[artistId] ?? [],
+    profileFor: (artistId) => state.artistProfiles[artistId] ?? {},
+    setArtistProfile: (artistId, patch) => setState((previous) => ({
+      ...previous,
+      artistProfiles: { ...previous.artistProfiles, [artistId]: { ...(previous.artistProfiles[artistId] ?? {}), ...patch } },
+    })),
     isReposted: (releaseId) => state.reposts.some((repost) => repost.releaseId === releaseId),
     isFollowing: (artistId) => state.followingArtistIds.includes(artistId),
     isLiked: (trackId) => state.likedTrackIds.includes(trackId),
@@ -252,7 +293,7 @@ export function SocialProvider({ children }: { children: React.ReactNode }) {
     recordPlay,
     getSettings,
     patchSettings: (releaseId, patch) => setState((previous) => ({ ...previous, settings: { ...previous.settings, [releaseId]: { ...(previous.settings[releaseId] ?? defaultSettings()), ...patch } } })),
-  }), [getSettings, recordPlay, state.artistLinks, state.blends, state.followingArtistIds, state.history, state.likedTrackIds, state.playlists, state.reposts, state.spotlight])
+  }), [addListenSeconds, getSettings, recordPlay, state.artistLinks, state.artistProfiles, state.blends, state.followingArtistIds, state.history, state.listenStats, state.likedTrackIds, state.playlists, state.reposts, state.spotlight])
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>
 }

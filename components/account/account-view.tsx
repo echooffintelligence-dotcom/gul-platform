@@ -13,6 +13,7 @@ import { SpotlightManager } from '@/components/creator/spotlight-manager'
 import { ArtistLinksEditor } from '@/components/artist/artist-links-editor'
 import { ActivityFeed } from '@/components/social/activity-feed'
 import { SocialLibrary } from '@/components/social/social-library'
+import { ListeningStats } from '@/components/social/listening-stats'
 import { BlendCreator } from '@/components/social/blend-creator'
 
 const ROLES = ['основная', 'сайд-проект', 'коллектив', 'псевдоним']
@@ -144,6 +145,7 @@ export function AccountView() {
 
       {activeArtist && <SpotlightManager artistId={activeArtist.id} releases={activeReleases} />}
       <ArtistLinksEditor artistId={activeId} />
+      <ListeningStats />
       <SocialLibrary />
       <BlendCreator />
       <ActivityFeed />

@@ -5,7 +5,7 @@ import { useMemo, useState } from 'react'
 import { ArrowDown, ArrowUp, Pause, Play, RotateCw } from 'lucide-react'
 import { usePlayer } from '@/components/providers/player-provider'
 import { useToast } from '@/components/providers/toast-provider'
-import { Cover } from '@/components/shared/art'
+import { TrackArt, TrackIndex } from '@/components/shared/track-art'
 import { TrackTitle } from '@/components/shared/track-title'
 
 import { TrackActions } from '@/components/social/track-actions'
@@ -151,28 +151,39 @@ export function ChartTable() {
               return (
                 <div
                   key={e.trackId}
+                  onDoubleClick={() => playEntry(e)}
                   className={cn(
-                    'group relative grid grid-cols-[36px_44px_minmax(0,1fr)_112px_84px_92px] items-center gap-4 border-b border-rule-soft px-2 py-3 transition-colors hover:bg-paper-2 md:grid-cols-[44px_48px_minmax(0,1fr)_132px_96px_92px_92px]',
-                    isCurrent && 'is-selected rounded-lg bg-paper-2',
+                    'track-row group relative grid grid-cols-[36px_44px_minmax(0,1fr)_112px_84px_92px] items-center gap-4 rounded-lg border-b border-rule-soft px-2 py-2 transition-colors hover:bg-paper-2 md:grid-cols-[44px_48px_minmax(0,1fr)_132px_96px_92px_92px]',
+                    isCurrent && 'bg-paper-2',
                   )}
                 >
-                  <div className={cn('tabnum text-right font-mono text-[1.375rem] font-semibold text-ink-3 transition-colors group-hover:text-red', isThisPlaying && 'text-red')}>
-                    {i + 1}
+                  <div className="text-right font-mono text-[1.375rem] font-semibold text-ink-3">
+                    <TrackIndex index={i + 1} />
                   </div>
-                  <button type="button" onClick={() => playEntry(e)} aria-label={`Слушать ${e.title}`}>
-                    <Cover cover={e.cover} coverUrl={e.coverUrl} className={cn('h-12 w-12', isCurrent && 'is-selected-cover')} />
-                  </button>
-                    <div className="min-w-0">
-                      <div className="flex items-center truncate text-[1.0625rem] font-bold [font-stretch:84%]">
-                        <TrackTitle title={e.title} credits={e.credits} featuring={getTrack(e.trackId)?.featuring ?? e.featuring} trackHref={`/release/${e.releaseId}`} className="truncate" artistClassName="text-ink-2" titleClassName="font-bold" />
-                        {isThisPlaying && (
-                          <span className="eq">
-                            <i /><i /><i />
-                          </span>
-                        )}
-                        {getTrack(e.trackId)?.isAiGenerated && <AiBadge compact className="ml-2" />}
-                      </div>
-                    </div>
+                  {/* Обложка вместо постоянной кнопки: play проявляется при наведении. */}
+                  <TrackArt
+                    cover={e.cover}
+                    coverUrl={e.coverUrl}
+                    title={e.title}
+                    isCurrent={isCurrent}
+                    isPlaying={isThisPlaying}
+                    onToggle={() => playEntry(e)}
+                    className="h-12 w-12"
+                  />
+                  <div className="flex min-w-0 items-center gap-2">
+                    <TrackTitle
+                      title={e.title}
+                      credits={e.credits}
+                      featuring={getTrack(e.trackId)?.featuring ?? e.featuring}
+                      trackHref={`/release/${e.releaseId}`}
+                      stacked
+                      className="min-w-0 flex-1"
+                      titleClassName={cn('text-[1.0625rem] font-bold [font-stretch:84%]', isCurrent && 'text-accent-1')}
+                      artistClassName="text-[0.78rem] text-ink-3"
+                    />
+                    {isThisPlaying && <span className="eq shrink-0"><i /><i /><i /></span>}
+                    {getTrack(e.trackId)?.isAiGenerated && <AiBadge compact />}
+                  </div>
                   <div>
                     <div className="flex items-baseline gap-2">
                       <b className="tabnum font-mono text-[1.0625rem] font-semibold">{e.score.toFixed(1)}</b>

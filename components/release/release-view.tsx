@@ -2,11 +2,12 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
-import { Bell } from 'lucide-react'
+import { Bell, Disc3 } from 'lucide-react'
 import { Avatar, Cover } from '@/components/shared/art'
 import { useReleases, gztAverage } from '@/components/providers/release-provider'
 import { GztRating } from './gzt-rating'
 import { TrackList } from './track-list'
+import { DiscManager } from './disc-manager'
 import { TrackFactsPanel } from './track-facts-panel'
 import { AudioVisualizer } from '@/components/player/audio-visualizer'
 import { RepostButton } from '@/components/social/repost-button'
@@ -20,6 +21,11 @@ export function ReleaseView({ releaseId, release: initialRelease }: { releaseId:
   const release = getRelease(releaseId) ?? initialRelease
   if (!release) return <div className="mx-auto max-w-[1180px] px-4 py-16 font-mono text-sm text-ink-3 sm:px-12">{hydrated ? 'Релиз не найден.' : 'Загружаем локальный каталог…'}</div>
   const tracks = release.trackIds.map((id) => getTrack(id)).filter((track): track is NonNullable<typeof track> => Boolean(track))
+
+  // Диски показываем только когда автор их задал; иначе релиз остаётся одним списком.
+  const discs = (release.discs ?? [])
+    .map((disc) => ({ ...disc, tracks: disc.trackIds.map((id) => getTrack(id)).filter((track): track is NonNullable<typeof track> => Boolean(track)) }))
+    .filter((disc) => disc.tracks.length > 0)
   const artistsResolved = release.artistIds.map((id) => getArtist(id)).filter((artist): artist is NonNullable<typeof artist> => Boolean(artist))
   const totalSec = tracks.reduce((sum, track) => sum + track.durationSec, 0)
   const factsTrack = tracks.find((track) => track.facts)
@@ -52,7 +58,7 @@ export function ReleaseView({ releaseId, release: initialRelease }: { releaseId:
         </div>
 
         <div>
-          <div className="flex flex-wrap items-center gap-2"><div className="eyebrow">{release.kind} · {release.year}</div><span className={certification === 'diamond' ? 'chip done !border-cyan-200/50 !text-cyan-100' : certification === 'gold' ? 'chip !border-amber-300/40 !text-amber-100' : 'chip'}>{certification === 'diamond' ? '💎 Бриллиант ГУЛА' : certification === 'gold' ? '🏆 Золотой релиз' : '📦 Underground / Свежий звук'}</span>{release.nomination && <span className="chip !border-fuchsia-300/45 !bg-fuchsia-300/10 !text-fuchsia-100 shadow-[0_0_18px_rgba(232,121,249,.18)]">{nominationLabels[release.nomination]}</span>}</div>
+          <div className="flex flex-wrap items-center gap-2"><div className="eyebrow">{release.kind} · {release.year}</div><span className={certification === 'diamond' ? 'chip done !border-accent-1/50 !text-accent-1' : certification === 'gold' ? 'chip !border-accent-hot/40 !text-accent-hot' : 'chip'}>{certification === 'diamond' ? '💎 Бриллиант ГУЛА' : certification === 'gold' ? '🏆 Золотой релиз' : '📦 Underground / Свежий звук'}</span>{release.nomination && <span className="chip !border-accent-hot/45 !bg-accent-hot/10 !text-accent-hot shadow-[0_0_18px_rgba(232,121,249,.18)]">{nominationLabels[release.nomination]}</span>}</div>
           <div className="flex flex-wrap items-start justify-between gap-3"><h1 className="text-[clamp(2rem,4.4vw,3rem)] font-black uppercase leading-[0.94] [font-stretch:66%]">{release.title}</h1><RepostButton releaseId={release.id} title={release.title} /></div>
 
           <div className="mt-3 inline-flex items-center gap-2 rounded-[2px] border border-ink py-[3px] pl-[3px] pr-2 text-[0.8125rem]">
@@ -80,8 +86,23 @@ export function ReleaseView({ releaseId, release: initialRelease }: { releaseId:
           <div className="mt-5 flex items-center justify-between gap-3"><div className="eyebrow">живой спектр · web audio</div><button type="button" className="ghost !px-3 !py-1.5 !text-xs" onClick={() => setShowVisualizer((value) => !value)}>{showVisualizer ? 'Скрыть визуализатор' : 'Показать визуализатор'}</button></div>
           {showVisualizer && <AudioVisualizer />}
           <div className="section-h"><h3>Треки</h3><span className="line" /><span className="eyebrow">все авторы кликабельны</span></div>
-          <TrackList tracks={tracks} />
+          {discs.length > 0 ? (
+            // Релиз разбит на диски: каждый со своим заголовком и сквозной нумерацией внутри.
+            discs.map((disc) => (
+              <section key={disc.id} className="mb-6">
+                <div className="mb-1 flex items-center gap-2 px-2 pt-2">
+                  <Disc3 className="h-3.5 w-3.5 shrink-0 text-ink-3" />
+                  <h4 className="text-[0.8125rem] font-semibold text-ink-2">{disc.title}</h4>
+                  <span className="ml-auto font-mono text-[0.65rem] text-ink-3">{disc.tracks.length}</span>
+                </div>
+                <TrackList tracks={disc.tracks} />
+              </section>
+            ))
+          ) : (
+            <TrackList tracks={tracks} />
+          )}
           <TrackFactsPanel track={factsTrack} />
+          <DiscManager release={release} />
           <CreatorSuite releaseId={release.id} releaseTitle={release.title} />
 
           <div className="section-h"><h3>Рецензии</h3><span className="line" /><span className="eyebrow">{release.reviewCount}</span></div>

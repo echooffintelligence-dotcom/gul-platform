@@ -33,7 +33,7 @@ export function MyWaveCard() {
       )}
       aria-labelledby="my-wave-title"
     >
-      <div className={cn('grid h-12 w-12 shrink-0 place-items-center rounded-2xl', waveActive ? 'bg-violet-300/20 text-violet-100' : 'bg-cyan-300/15 text-cyan-100')}>
+      <div className={cn('grid h-12 w-12 shrink-0 place-items-center rounded-2xl', waveActive ? 'bg-accent-2/20 text-accent-2' : 'bg-accent-1/15 text-accent-1')}>
         <Radio className={cn('h-5 w-5', waveActive && 'animate-pulse')} />
       </div>
 
@@ -70,8 +70,8 @@ export function MyWaveToggle({ className }: { className?: string }) {
       aria-label={waveActive ? 'Остановить «Мою волну»' : 'Запустить «Мою волну»'}
       aria-pressed={waveActive}
       className={cn(
-        'rounded-lg p-1.5 transition-all duration-300 hover:bg-white/5 active:scale-95',
-        waveActive ? 'bg-violet-300/15 text-violet-100 shadow-[0_0_16px_rgba(167,139,250,.35)]' : 'text-ink-2 hover:text-accent-b',
+        'rounded-lg p-1.5 transition-all duration-300 hover:bg-paper-2 active:scale-95',
+        waveActive ? 'bg-accent-2/15 text-accent-2' : 'text-ink-2 hover:text-accent-b',
         className,
       )}
     >

@@ -1,68 +1,87 @@
 'use client'
 
-import { Pause, Play, Volume1 } from 'lucide-react'
+import { Volume1 } from 'lucide-react'
 import { usePlayer } from '@/components/providers/player-provider'
 import { useToast } from '@/components/providers/toast-provider'
 import { TrackTitle } from '@/components/shared/track-title'
-
+import { TrackArt, TrackIndex } from '@/components/shared/track-art'
 import { TrackActions } from '@/components/social/track-actions'
 import { AiBadge } from '@/components/shared/ai-badge'
 import type { Track } from '@/lib/data'
 import { cn } from '@/lib/utils'
 
-export function TrackList({ tracks }: { tracks: Track[] }) {
+export function TrackList({ tracks, startIndex = 0 }: { tracks: Track[]; startIndex?: number }) {
   const { currentTrack, isPlaying, playTrack, pause, resume, setLyricsOpen } = usePlayer()
-
-  const activateTrack = (t: Track) => {
-    const isCurrent = currentTrack.id === t.id
-    if (isCurrent) { if (isPlaying) pause(); else resume(); return }
-    playTrack({ id: t.id, title: t.title, credits: t.credits, featuring: t.featuring, cover: t.cover, coverUrl: t.coverUrl, durationSec: t.durationSec, audioUrl: t.audioUrl ?? '/audio/gul-demo.wav', waveform: t.waveform, releaseId: t.releaseId, isAiGenerated: t.isAiGenerated })
-  }
   const { toast } = useToast()
 
+  const activateTrack = (track: Track) => {
+    if (currentTrack.id === track.id) {
+      if (isPlaying) pause()
+      else resume()
+      return
+    }
+    playTrack({
+      id: track.id, title: track.title, credits: track.credits, featuring: track.featuring,
+      cover: track.cover, coverUrl: track.coverUrl, durationSec: track.durationSec,
+      audioUrl: track.audioUrl ?? '/audio/gul-demo.wav', waveform: track.waveform,
+      releaseId: track.releaseId, isAiGenerated: track.isAiGenerated,
+    })
+  }
+
   return (
-    <div className="border-t border-ink">
-      {tracks.map((t, i) => {
-        const isCurrent = currentTrack.id === t.id
+    <div className="border-t border-rule">
+      {tracks.map((track, index) => {
+        const isCurrent = currentTrack.id === track.id
         const isThisPlaying = isCurrent && isPlaying
         return (
           <div
-            key={t.id}
+            key={track.id}
+            onDoubleClick={() => activateTrack(track)}
             className={cn(
-              'grid grid-cols-[28px_minmax(0,1fr)_78px_58px_72px] items-center gap-4 border-b border-rule-soft px-2 py-3 transition-colors hover:bg-paper-2',
-              isCurrent && 'is-selected rounded-lg bg-paper-2',
+              'track-row grid grid-cols-[24px_40px_minmax(0,1fr)_72px_52px_72px] items-center gap-3 rounded-lg border-b border-rule-soft px-2 py-2 transition-colors hover:bg-paper-2',
+              isCurrent && 'bg-paper-2',
             )}
           >
-            <button
-              type="button"
-              className="text-right font-mono text-[0.8125rem] text-ink-3"
-              onClick={() => activateTrack(t)}
-              aria-label={`Слушать ${t.title}`}
-            >
-              {isThisPlaying ? <Volume1 width={13} height={13} className="ml-auto text-red" /> : isCurrent ? <Pause width={13} height={13} className="ml-auto text-cyan-200" /> : i + 1}
-            </button>
-            <div className="min-w-0">
-              <div className="flex items-center gap-2">
-                <TrackTitle title={t.title} credits={t.credits} featuring={t.featuring} className={cn('truncate text-[0.9375rem] font-semibold', isThisPlaying && 'text-red')} artistClassName="text-ink-2" titleClassName="font-semibold" />
-                {!isCurrent && <button type="button" onClick={() => activateTrack(t)} aria-label={`Слушать ${t.title}`} className="grid h-6 w-6 shrink-0 place-items-center rounded hover:bg-paper-3"><Play className="h-3 w-3 text-ink-3" /></button>}
-                {t.isAiGenerated && <AiBadge compact />}
-                {t.hasLyrics && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setLyricsOpen(true)
-                      toast('Текст открыт')
-                    }}
-                    className="rounded-[2px] border border-blue-soft px-1 font-mono text-[0.5625rem] tracking-[0.06em] text-blue"
-                  >
-                    TXT
-                  </button>
-                )}
-              </div>
+            <span className="text-right font-mono text-[0.8125rem] text-ink-3">
+              {isThisPlaying ? <Volume1 width={13} height={13} className="ml-auto text-accent-1" /> : <TrackIndex index={startIndex + index + 1} />}
+            </span>
+
+            {/* Обложка вместо кнопки: play проявляется при наведении на строку */}
+            <TrackArt
+              cover={track.cover}
+              coverUrl={track.coverUrl}
+              title={track.title}
+              isCurrent={isCurrent}
+              isPlaying={isThisPlaying}
+              onToggle={() => activateTrack(track)}
+              className="h-10 w-10"
+            />
+
+            <div className="flex min-w-0 items-center gap-2">
+              <TrackTitle
+                title={track.title}
+                credits={track.credits}
+                featuring={track.featuring}
+                stacked
+                className="min-w-0 flex-1"
+                titleClassName={cn('text-[0.9375rem] font-semibold', isCurrent && 'text-accent-1')}
+                artistClassName="text-[0.75rem] text-ink-3"
+              />
+              {track.isAiGenerated && <AiBadge compact />}
+              {track.hasLyrics && (
+                <button
+                  type="button"
+                  onClick={() => { setLyricsOpen(true); toast('Текст открыт') }}
+                  className="shrink-0 rounded border border-rule px-1 font-mono text-[0.5625rem] tracking-[0.06em] text-accent-1 transition-colors hover:border-accent-1/50"
+                >
+                  TXT
+                </button>
+              )}
             </div>
-            <div className="text-right font-mono text-[0.75rem] text-ink-2">{t.plays.toLocaleString('ru-RU')}</div>
-            <div className="text-right font-mono text-[0.75rem] text-ink-3">{t.duration}</div>
-            <TrackActions trackId={t.id} title={t.title} className="justify-end" />
+
+            <div className="text-right font-mono text-[0.75rem] text-ink-2">{track.plays.toLocaleString('ru-RU')}</div>
+            <div className="text-right font-mono text-[0.75rem] text-ink-3">{track.duration}</div>
+            <TrackActions trackId={track.id} title={track.title} className="justify-end" />
           </div>
         )
       })}

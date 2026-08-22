@@ -69,6 +69,7 @@ export function UploadTrackModal() {
   const [releaseTitle, setReleaseTitle] = useState('')
   const [trackTitle, setTrackTitle] = useState('')
   const [featuring, setFeaturing] = useState('')
+  const [videoUrl, setVideoUrl] = useState('')
   const [kind, setKind] = useState<(typeof RELEASE_KINDS)[number]>('сингл')
   const [genre, setGenre] = useState(GENRES[0])
   const [producedBy, setProducedBy] = useState('')
@@ -157,6 +158,7 @@ export function UploadTrackModal() {
         ownerId: user?.id ?? 'local-anonymous',
         trackTitle,
         featuring: toList(featuring),
+        videoUrl: videoUrl.trim() || undefined,
         durationSec,
         audioUrl: audio.url,
         coverUrl,
@@ -205,6 +207,7 @@ export function UploadTrackModal() {
       setReleaseTitle('')
       setTrackTitle('')
       setFeaturing('')
+      setVideoUrl('')
       setProducedBy('')
       setWrittenBy('')
       setMixedMasteredBy('')
@@ -244,7 +247,7 @@ export function UploadTrackModal() {
       </div>
 
       {!accessToken && (
-        <p className="mt-4 flex items-start gap-2 rounded-xl border border-amber-300/30 bg-amber-300/[.06] p-3 font-mono text-xs text-amber-100">
+        <p className="mt-4 flex items-start gap-2 rounded-xl border border-accent-hot/30 bg-accent-hot/[.06] p-3 font-mono text-xs text-accent-hot">
           <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
           Вы работаете в локальном режиме без подтверждённой сессии. Публикация останется только в этом браузере: аудио не попадёт в Storage и не будет доступно другим слушателям.
         </p>
@@ -263,7 +266,7 @@ export function UploadTrackModal() {
           </div>
         </div>
 
-        <div className="rounded-xl border border-cyan-300/15 bg-cyan-300/[.025] p-3">
+        <div className="rounded-xl border border-accent-1/15 bg-accent-1/[.025] p-3">
           <div className="eyebrow mb-3">создатели и факты · genius-style</div>
           <div className="grid gap-3 sm:grid-cols-2">
             <label className="grid gap-1"><span className="font-mono text-xs text-ink-3">Продюсер / битмейкер</span><input value={producedBy} onChange={(event) => setProducedBy(event.target.value)} placeholder="имя, ещё имя" className={fieldClass} /></label>
@@ -274,9 +277,15 @@ export function UploadTrackModal() {
           </div>
         </div>
 
+        <label className="grid gap-1">
+          <span className="font-mono text-xs text-ink-3">Ссылка на клип — необязательно</span>
+          <input value={videoUrl} onChange={(event) => setVideoUrl(event.target.value)} placeholder="https://.../clip.mp4" className={fieldClass} />
+          <span className="font-mono text-[.6rem] text-ink-3">Если клип есть, в плеере появится кнопка «Клип» и видео откроется во весь экран.</span>
+        </label>
+
         {/* Маркировка ИИ-треков */}
-        <label className={cn('flex cursor-pointer items-start gap-3 rounded-xl border p-3 transition-colors', isAiGenerated ? 'is-selected border-violet-300/40 bg-violet-300/[.06]' : 'border-ink-1 hover:border-ink')}>
-          <input type="checkbox" checked={isAiGenerated} onChange={(event) => setIsAiGenerated(event.target.checked)} className="mt-0.5 h-4 w-4 shrink-0 accent-violet-400" />
+        <label className={cn('flex cursor-pointer items-start gap-3 rounded-xl border p-3 transition-colors', isAiGenerated ? 'is-selected border-accent-2/40 bg-accent-2/[.06]' : 'border-ink-1 hover:border-ink')}>
+          <input type="checkbox" checked={isAiGenerated} onChange={(event) => setIsAiGenerated(event.target.checked)} className="mt-0.5 h-4 w-4 shrink-0 accent-[var(--accent-2)]" />
           <span>
             <span className="block font-mono text-sm">🤖 Трек создан с помощью ИИ (Suno, Udio и др.)</span>
             <span className="mt-1 block font-mono text-[.65rem] text-ink-3">На карточке трека, в чарте и в плеере появится бейдж AI. Честная маркировка — требование площадки.</span>
@@ -321,7 +330,7 @@ export function UploadTrackModal() {
         )}
         {message && <p role="status" className="font-mono text-xs text-ink-2">{message}</p>}
         {warning && (
-          <p role="alert" className="flex items-start gap-2 rounded-xl border border-amber-300/35 bg-amber-300/[.07] p-3 font-mono text-xs text-amber-100">
+          <p role="alert" className="flex items-start gap-2 rounded-xl border border-accent-hot/35 bg-accent-hot/[.07] p-3 font-mono text-xs text-accent-hot">
             <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
             {warning}
           </p>

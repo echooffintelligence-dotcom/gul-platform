@@ -36,6 +36,12 @@ export type Artist = {
   avg: number
   tracks: number
   verified: boolean
+  /** Описание артиста для шапки профиля. */
+  bio?: string
+  /** Пользовательская аватарка; без неё показываются инициалы. */
+  avatarUrl?: string
+  /** Обложка-шапка профиля; без неё фон собирается из палитры темы. */
+  bannerUrl?: string
   /** аккаунт, к которому привязана карточка */
   account: string
   managedBy: string[]
@@ -65,6 +71,8 @@ export type Track = {
   featuring?: string[]
   /** Трек создан с помощью ИИ (Suno, Udio и подобные генераторы). */
   isAiGenerated?: boolean
+  /** Видеоклип к треку. Есть — в плеере появляется кнопка «Клип». */
+  videoUrl?: string
 }
 
 /**
@@ -125,6 +133,19 @@ export type Review = {
   text: string
 }
 
+/**
+ * Диск внутри релиза.
+ *
+ * Название задаёт автор целиком: в Spotify это «Диск 1», но артисты часто
+ * хотят «Диск 1: Ночная смена». Поэтому храним строку, а не только номер.
+ */
+export type ReleaseDisc = {
+  id: string
+  /** Полный заголовок секции, например «Диск 1: Круто Классно». */
+  title: string
+  trackIds: string[]
+}
+
 export type Release = {
   id: string
   title: string
@@ -139,6 +160,8 @@ export type Release = {
   weeksInChart?: number
   plays: number
   trackIds: string[]
+  /** Разбиение на диски. Пусто — релиз показывается одним списком. */
+  discs?: ReleaseDisc[]
   votes: number
   reviewCount: number
   editorial: GztScore | null

@@ -38,8 +38,8 @@ function Badge({ link, support = false }: { link: ArtistLink; support?: boolean 
       rel={isEmail ? undefined : 'noopener noreferrer'}
       className={
         support
-          ? 'inline-flex max-w-full items-center gap-1.5 rounded-full border border-rose-300/35 bg-rose-300/10 px-3 py-1.5 font-mono text-xs text-rose-100 transition-colors hover:border-rose-200/60 hover:bg-rose-300/20'
-          : 'inline-flex max-w-full items-center gap-1.5 rounded-full border border-cyan-300/30 bg-cyan-300/10 px-3 py-1.5 font-mono text-xs text-cyan-50 transition-colors hover:border-cyan-200/60 hover:bg-cyan-300/20'
+          ? 'inline-flex max-w-full items-center gap-1.5 rounded-full border border-accent-hot/35 bg-accent-hot/10 px-3 py-1.5 font-mono text-xs text-accent-hot transition-colors hover:border-accent-hot/60 hover:bg-accent-hot/20'
+          : 'inline-flex max-w-full items-center gap-1.5 rounded-full border border-accent-1/30 bg-accent-1/10 px-3 py-1.5 font-mono text-xs text-accent-1 transition-colors hover:border-accent-1/60 hover:bg-accent-1/20'
       }
     >
       <Icon className="h-3.5 w-3.5 shrink-0" />

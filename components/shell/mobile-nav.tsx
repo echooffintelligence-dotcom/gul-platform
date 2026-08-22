@@ -2,13 +2,13 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { BarChart3, Disc3, Layers, Mic2 } from 'lucide-react'
+import { BarChart3, Layers, Podcast, Search } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 const items = [
   { href: '/', label: 'Чарт', icon: BarChart3, match: (p: string) => p === '/' },
-  { href: '/release/steklovata', label: 'Релиз', icon: Disc3, match: (p: string) => p.startsWith('/release') },
-  { href: '/artist/yegeor', label: 'Артист', icon: Mic2, match: (p: string) => p.startsWith('/artist') },
+  { href: '/search', label: 'Поиск', icon: Search, match: (p: string) => p.startsWith('/search') },
+  { href: '/podcasts', label: 'Подкасты', icon: Podcast, match: (p: string) => p.startsWith('/podcast') },
   { href: '/account', label: 'Кабинет', icon: Layers, match: (p: string) => p.startsWith('/account') },
 ]
 

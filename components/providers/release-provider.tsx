@@ -1,7 +1,7 @@
 'use client'
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react'
-import { chart as seedChart, getTrack as getSeedTrack, releases as seedReleases, gztTotal, type ChartEntry, type CoverKey, type Credit, type GztScore, type Release, type Track, type TrackFacts } from '@/lib/data'
+import { chart as seedChart, getTrack as getSeedTrack, releases as seedReleases, gztTotal, type ChartEntry, type CoverKey, type Credit, type GztScore, type Release, type ReleaseDisc, type Track, type TrackFacts } from '@/lib/data'
 
 type PublishReleaseInput = {
   releaseTitle: string
@@ -17,6 +17,7 @@ type PublishReleaseInput = {
   facts?: TrackFacts
   featuring?: string[]
   isAiGenerated?: boolean
+  videoUrl?: string
 }
 
 type PublishedRelease = { release: Release; track: Track }
@@ -29,6 +30,8 @@ type ReleaseStore = {
   getRelease: (id: string) => Release | undefined
   getTrack: (id: string) => Track | undefined
   rateRelease: (releaseId: string, score: GztScore) => void
+  /** Разбивает релиз на именованные диски. Пустой массив убирает разбиение. */
+  setReleaseDiscs: (releaseId: string, discs: ReleaseDisc[]) => void
   publishRelease: (input: PublishReleaseInput) => PublishedRelease
 }
 
@@ -97,6 +100,16 @@ export function ReleaseProvider({ children }: { children: React.ReactNode }) {
     })
   }, [])
 
+  const setReleaseDiscs = useCallback((releaseId: string, discs: ReleaseDisc[]) => {
+    setState((previous) => ({
+      ...previous,
+      releases: previous.releases.map((release) => release.id === releaseId
+        // Пустой список убираем совсем: undefined означает «релиз без разбиения».
+        ? { ...release, discs: discs.length > 0 ? discs : undefined }
+        : release),
+    }))
+  }, [])
+
   const publishRelease = useCallback((input: PublishReleaseInput): PublishedRelease => {
     const releaseId = `release-${crypto.randomUUID()}`
     const trackId = `track-${crypto.randomUUID()}`
@@ -118,6 +131,7 @@ export function ReleaseProvider({ children }: { children: React.ReactNode }) {
       facts: input.facts,
       featuring: input.featuring,
       isAiGenerated: input.isAiGenerated ?? false,
+      videoUrl: input.videoUrl,
     }
     const release: Release = {
       id: releaseId,
@@ -147,7 +161,7 @@ export function ReleaseProvider({ children }: { children: React.ReactNode }) {
   const getRelease = useCallback((id: string) => state.releases.find((release) => release.id === id), [state.releases])
   const getTrack = useCallback((id: string) => state.customTracks.find((track) => track.id === id) ?? getSeedTrack(id), [state.customTracks])
 
-  const value = useMemo<ReleaseStore>(() => ({ releases: state.releases, chart: state.chart, customTracks: state.customTracks, hydrated, getRelease, getTrack, rateRelease, publishRelease }), [state.releases, state.chart, state.customTracks, hydrated, getRelease, getTrack, rateRelease, publishRelease])
+  const value = useMemo<ReleaseStore>(() => ({ releases: state.releases, chart: state.chart, customTracks: state.customTracks, hydrated, getRelease, getTrack, rateRelease, setReleaseDiscs, publishRelease }), [state.releases, state.chart, state.customTracks, hydrated, getRelease, getTrack, rateRelease, setReleaseDiscs, publishRelease])
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>
 }

@@ -43,9 +43,9 @@ export function AudioVisualizer() {
   }, [frequencyData, playing, visualizerEnabled])
 
   return (
-    <section className="mt-5 overflow-hidden rounded-2xl border border-cyan-300/20 bg-[radial-gradient(circle_at_50%_0%,rgba(78,230,255,.12),transparent_55%),rgba(3,8,18,.75)] p-4 shadow-inner shadow-cyan-300/5">
+    <section className="mt-5 overflow-hidden rounded-2xl border border-accent-1/20 bg-[radial-gradient(circle_at_50%_0%,rgba(78,230,255,.12),transparent_55%),rgba(3,8,18,.75)] p-4 shadow-inner shadow-cyan-300/5">
       <div className="flex items-center justify-between gap-3"><div><div className="eyebrow">web audio spectrum</div><h3 className="mt-1 text-sm font-semibold">Живой визуализатор</h3></div><button type="button" aria-pressed={visualizerEnabled} onClick={toggleVisualizer} className={visualizerEnabled ? 'solid !px-3 !py-2 !text-xs' : 'ghost !px-3 !py-2 !text-xs'}><Activity className="h-3.5 w-3.5" />{visualizerEnabled ? 'Выключить' : 'Визуализатор'}</button></div>
-      {visualizerEnabled ? <canvas ref={canvasRef} className="mt-4 h-28 w-full rounded-xl bg-black/30" aria-label="Спектр текущего трека" /> : <p className="mt-3 text-sm text-ink-3">Включите спектр: частоты будут считываться напрямую из Web Audio analyser во время воспроизведения.</p>}
+      {visualizerEnabled ? <canvas ref={canvasRef} className="mt-4 h-28 w-full rounded-xl bg-paper-2" aria-label="Спектр текущего трека" /> : <p className="mt-3 text-sm text-ink-3">Включите спектр: частоты будут считываться напрямую из Web Audio analyser во время воспроизведения.</p>}
     </section>
   )
 }
